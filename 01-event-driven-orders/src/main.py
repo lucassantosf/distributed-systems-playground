@@ -5,9 +5,14 @@ from fastapi import FastAPI
 from src.api.routes.health import router as health_router
 from src.settings import settings
 
+from src.infrastructure.database import init_db
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # initialize DB tables in development so the mapped models exist
+    if settings.ENVIRONMENT == "development":
+        init_db()
     yield
 
 
