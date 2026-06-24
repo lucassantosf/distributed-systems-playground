@@ -18,7 +18,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/Containerfile
+      dockerfile: ./docker/Containerfile
     ports:
       - "8000:8000"
     volumes:
@@ -43,5 +43,17 @@ services:
       timeout: 10s
       retries: 3
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    ports:
+      - "${RABBITMQ_HOST_PORT:-15672}:15672" # management UI
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"   # AMQP
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+
 volumes:
   pgdata:
+  rabbitmqdata:

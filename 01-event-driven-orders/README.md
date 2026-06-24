@@ -123,3 +123,45 @@ Notas:
 - `init_db()` com retry está disponível para reduzir condições de corrida ao subir com Docker Compose; ainda assim, para produção prefira executar migrações via Alembic.
 - `.env.example` contém exemplos de `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `DATABASE_URL`.
 
+## Mensageria (RabbitMQ)
+
+O `docker-compose.yml` agora inclui um serviço `rabbitmq` com o plugin de management (`rabbitmq:3-management`).
+
+- **Portas expostas por padrão (host):**
+	- Management UI: `15672` (mapeado para `${RABBITMQ_HOST_PORT}`)
+	- AMQP: `5672` (mapeado para `${RABBITMQ_AMQP_PORT}`)
+
+- **Credenciais:** padrão `guest`/`guest`, configuráveis via `.env` (`RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`).
+
+Validação / uso:
+
+- Subir serviços:
+
+```bash
+docker compose up -d --build
+```
+
+- Acessar a dashboard do RabbitMQ no host:
+
+```
+http://localhost:15672
+```
+
+- Faça login com as credenciais configuradas em `.env` (padrão `guest`/`guest`).
+
+- Verifique que o serviço AMQP está acessível na porta `5672` para clientes/producers/consumers.
+
+## Eventos (publisher)
+
+Ao criar um pedido (`POST /orders`) a aplicação agora publica um evento simples no RabbitMQ:
+
+```json
+{ "event": "order_created", "order_id": 123 }
+```
+
+Detalhes:
+- O evento é publicado na fila `orders` (a aplicação declara a fila antes de publicar).
+- Você pode visualizar as mensagens na dashboard do RabbitMQ: abra a UI em `http://localhost:15672`, vá em "Queues" e clique na fila `orders`. As mensagens aparecerão na coluna "Ready" se nenhuma consumer estiver conectado.
+
+
+
