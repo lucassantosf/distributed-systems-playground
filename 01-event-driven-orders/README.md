@@ -163,5 +163,54 @@ Detalhes:
 - O evento é publicado na fila `orders` (a aplicação declara a fila antes de publicar).
 - Você pode visualizar as mensagens na dashboard do RabbitMQ: abra a UI em `http://localhost:15672`, vá em "Queues" e clique na fila `orders`. As mensagens aparecerão na coluna "Ready" se nenhuma consumer estiver conectado.
 
+## Workers
+
+### Email worker
+
+Um worker simples foi adicionado em `workers/email/worker.py`. Ele consome mensagens da fila `orders` e simula o envio de e-mail escrevendo uma linha em `workers/email/sent_emails.log`.
+
+Como executar via Docker Compose:
+
+```bash
+docker compose up -d --build email_worker
+```
+
+Validação:
+
+- Crie um pedido via `POST /orders`.
+- Observe o log do worker ou abra o arquivo local `workers/email/sent_emails.log` (ele é montado no container):
+
+```bash
+# ver logs do container
+docker compose logs -f email_worker
+
+# ou verificar arquivo local
+cat workers/email/sent_emails.log
+```
+
+### Billing worker
+
+Um worker adicional foi adicionado em `workers/billing/worker.py` para demonstrar o desacoplamento. Ele também consome mensagens da fila `orders` e simula a geração de invoice escrevendo uma linha em `workers/billing/generated_invoices.log`.
+
+Como executar via Docker Compose:
+
+```bash
+docker compose up -d --build billing_worker
+```
+
+Validação:
+
+- Crie um pedido via `POST /orders`.
+- Observe o log do worker ou abra o arquivo local `workers/billing/generated_invoices.log`:
+
+```bash
+# ver logs do container
+docker compose logs -f billing_worker
+
+# ou verificar arquivo local
+cat workers/billing/generated_invoices.log
+```
+
+
 
 

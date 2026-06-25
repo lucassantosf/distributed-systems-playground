@@ -12,7 +12,11 @@ class Settings(BaseSettings):
     RABBITMQ_AMQP_PORT: int = 5672
     RABBITMQ_USER: str = Field("guest", env="RABBITMQ_DEFAULT_USER")
     RABBITMQ_PASS: str = Field("guest", env="RABBITMQ_DEFAULT_PASS")
-    RABBITMQ_QUEUE: str = "orders"
+    RABBITMQ_EXCHANGE: str = "order_events"
+    RABBITMQ_EXCHANGE_TYPE: str = "fanout"
+    RABBITMQ_EMAIL_QUEUE: str = "email_orders"
+    RABBITMQ_BILLING_QUEUE: str = "billing_orders"
+    RABBITMQ_NOTIFICATION_QUEUE: str = "notification_orders"
 
     model_config = {"env_file": ".env"}
 

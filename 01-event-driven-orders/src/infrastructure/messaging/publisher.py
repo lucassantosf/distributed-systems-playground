@@ -15,11 +15,10 @@ def publish_order_created(order_id: int) -> None:
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
-    queue_name = settings.RABBITMQ_QUEUE
-    # ensure queue exists
-    channel.queue_declare(queue=queue_name, durable=True)
+    exchange_name = settings.RABBITMQ_EXCHANGE
+    channel.exchange_declare(exchange=exchange_name, exchange_type=settings.RABBITMQ_EXCHANGE_TYPE, durable=True)
 
     body = json.dumps({"event": "order_created", "order_id": order_id})
-    channel.basic_publish(exchange="", routing_key=queue_name, body=body)
+    channel.basic_publish(exchange=exchange_name, routing_key="", body=body)
 
     connection.close()

@@ -54,6 +54,48 @@ services:
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq
 
+  email_worker:
+    build:
+      context: .
+      dockerfile: ./docker/Containerfile
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - rabbitmq
+    command: python -u workers/email/worker.py
+    volumes:
+      - ./workers:/app/workers:rw
+
+  billing_worker:
+    build:
+      context: .
+      dockerfile: ./docker/Containerfile
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - rabbitmq
+    command: python -u workers/billing/worker.py
+    volumes:
+      - ./workers:/app/workers:rw
+
+  notification_worker:
+    build:
+      context: .
+      dockerfile: ./docker/Containerfile
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - rabbitmq
+    command: python -u workers/notification/worker.py
+    volumes:
+      - ./workers:/app/workers:rw
+
 volumes:
   pgdata:
   rabbitmqdata:
