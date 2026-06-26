@@ -5,7 +5,7 @@ import pika
 from src.settings import settings
 
 def publish_order_created(order_id: int) -> None:
-    """Publish a simple 'order_created' event to RabbitMQ queue.
+    """Publish a simple 'order_created' event to a RabbitMQ exchange.
 
     This uses a short-lived BlockingConnection; acceptable for demo/dev.
     """

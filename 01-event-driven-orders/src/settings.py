@@ -15,8 +15,12 @@ class Settings(BaseSettings):
     RABBITMQ_EXCHANGE: str = "order_events"
     RABBITMQ_EXCHANGE_TYPE: str = "fanout"
     RABBITMQ_EMAIL_QUEUE: str = "email_orders"
+    RABBITMQ_EMAIL_RETRY_QUEUE: str = "email_orders_retry"
     RABBITMQ_BILLING_QUEUE: str = "billing_orders"
+    RABBITMQ_BILLING_RETRY_QUEUE: str = "billing_orders_retry"
     RABBITMQ_NOTIFICATION_QUEUE: str = "notification_orders"
+    RABBITMQ_RETRY_DELAY_MS: int = 5000
+    RABBITMQ_MAX_RETRIES: int = 3
 
     model_config = {"env_file": ".env"}
 

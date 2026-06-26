@@ -160,8 +160,10 @@ Ao criar um pedido (`POST /orders`) a aplicação agora publica um evento simple
 ```
 
 Detalhes:
-- O evento é publicado na fila `orders` (a aplicação declara a fila antes de publicar).
-- Você pode visualizar as mensagens na dashboard do RabbitMQ: abra a UI em `http://localhost:15672`, vá em "Queues" e clique na fila `orders`. As mensagens aparecerão na coluna "Ready" se nenhuma consumer estiver conectado.
+- O evento é publicado em um exchange fanout chamado `order_events`.
+- Cada worker consome de sua própria fila dedicada: `email_orders`, `billing_orders` e `notification_orders`.
+- Para testar retry no worker, envie um pedido com `order_id=99`; os workers de e-mail e faturamento simulam falha e reencaminham a mensagem para suas filas de retry.
+- Você pode visualizar as filas na dashboard do RabbitMQ: abra a UI em `http://localhost:15672`, vá em "Queues" e verifique `email_orders`, `billing_orders`, `notification_orders` e seus respectivos `*_retry` queues.
 
 ## Workers
 
