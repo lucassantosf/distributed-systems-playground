@@ -50,8 +50,17 @@ def main():
     channel = connection.channel()
     exchange_name = settings.RABBITMQ_EXCHANGE
     queue_name = settings.RABBITMQ_NOTIFICATION_QUEUE
+    dead_letter_exchange_name = settings.RABBITMQ_DEAD_LETTER_EXCHANGE
+    dead_letter_queue_name = settings.RABBITMQ_NOTIFICATION_DLQ_QUEUE
+
     channel.exchange_declare(exchange=exchange_name, exchange_type=settings.RABBITMQ_EXCHANGE_TYPE, durable=True)
-    channel.queue_declare(queue=queue_name, durable=True)
+    channel.exchange_declare(exchange=dead_letter_exchange_name, exchange_type="direct", durable=True)
+    channel.queue_declare(queue=dead_letter_queue_name, durable=True)
+    channel.queue_bind(exchange=dead_letter_exchange_name, queue=dead_letter_queue_name, routing_key=dead_letter_queue_name)
+    channel.queue_declare(queue=queue_name, durable=True, arguments={
+        "x-dead-letter-exchange": dead_letter_exchange_name,
+        "x-dead-letter-routing-key": dead_letter_queue_name,
+    })
     channel.queue_bind(exchange=exchange_name, queue=queue_name)
     channel.basic_qos(prefetch_count=1)
     channel.basic_consume(queue=queue_name, on_message_callback=on_message)

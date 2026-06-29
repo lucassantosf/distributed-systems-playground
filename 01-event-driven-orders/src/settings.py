@@ -14,11 +14,15 @@ class Settings(BaseSettings):
     RABBITMQ_PASS: str = Field("guest", env="RABBITMQ_DEFAULT_PASS")
     RABBITMQ_EXCHANGE: str = "order_events"
     RABBITMQ_EXCHANGE_TYPE: str = "fanout"
+    RABBITMQ_DEAD_LETTER_EXCHANGE: str = "order_events_dlx"
     RABBITMQ_EMAIL_QUEUE: str = "email_orders"
     RABBITMQ_EMAIL_RETRY_QUEUE: str = "email_orders_retry"
+    RABBITMQ_EMAIL_DLQ_QUEUE: str = "email_orders_dlq"
     RABBITMQ_BILLING_QUEUE: str = "billing_orders"
     RABBITMQ_BILLING_RETRY_QUEUE: str = "billing_orders_retry"
+    RABBITMQ_BILLING_DLQ_QUEUE: str = "billing_orders_dlq"
     RABBITMQ_NOTIFICATION_QUEUE: str = "notification_orders"
+    RABBITMQ_NOTIFICATION_DLQ_QUEUE: str = "notification_orders_dlq"
     RABBITMQ_RETRY_DELAY_MS: int = 5000
     RABBITMQ_MAX_RETRIES: int = 3
 
