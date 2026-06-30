@@ -131,6 +131,19 @@ O `docker-compose.yml` agora inclui um serviço `rabbitmq` com o plugin de manag
 	- Management UI: `15672` (mapeado para `${RABBITMQ_HOST_PORT}`)
 	- AMQP: `5672` (mapeado para `${RABBITMQ_AMQP_PORT}`)
 
+## Logs estruturados
+
+Os eventos e operações principais agora geram logs JSON estruturados com campos como `event`, `order_id`, `worker`, `status` e `retry_count`.
+
+- Saída padrão (stdout): visível nos logs da API/worker com `docker compose logs -f api` ou `docker compose logs -f email_worker`.
+- Arquivo local: [logs/structured.log](logs/structured.log)
+
+Exemplo de linha de log:
+
+```json
+{"timestamp": "2026-06-29T10:00:00", "level": "INFO", "logger": "src.infrastructure.messaging.publisher", "message": "Published order created event", "event": "order_created", "order_id": 123}
+```
+
 - **Credenciais:** padrão `guest`/`guest`, configuráveis via `.env` (`RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`).
 
 Validação / uso:

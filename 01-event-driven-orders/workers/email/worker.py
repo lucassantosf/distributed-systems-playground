@@ -17,6 +17,10 @@ if ROOT not in sys.path:
 import pika
 
 from src.settings import settings
+from src.infrastructure.logging import configure_logging, get_logger
+
+configure_logging()
+logger = get_logger("workers.email.worker")
 
 LOG_PATH = "/app/workers/email/sent_emails.log"
 
@@ -40,12 +44,20 @@ def republish_to_retry(ch, body, headers, retry_queue):
 def on_message(ch, method, properties, body):
     try:
         payload = json.loads(body)
+        correlation_id = payload.get("correlation_id")
         if payload.get("event") == "order_created":
             order_id = payload.get("order_id")
             retry_count = get_retry_count(properties)
+            logger.info(
+                "Processing order_created event",
+                extra={"event": "order_created", "order_id": order_id, "worker": "email", "queue": settings.RABBITMQ_EMAIL_QUEUE, "retry_count": retry_count, "correlation_id": correlation_id},
+            )
             # simulate failure for order 99 to test retry behavior
             if retry_count < settings.RABBITMQ_MAX_RETRIES and order_id == 99:
-                print(f"Simulating failure for order_id={order_id}, retry_count={retry_count}")
+                logger.warning(
+                    "Simulating retryable email failure",
+                    extra={"event": "order_created", "order_id": order_id, "worker": "email", "retry_count": retry_count, "status": "retrying", "correlation_id": correlation_id},
+                )
                 republish_to_retry(ch, body, getattr(properties, "headers", None), settings.RABBITMQ_EMAIL_RETRY_QUEUE)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
@@ -53,6 +65,10 @@ def on_message(ch, method, properties, body):
             line = f"{datetime.utcnow().isoformat()} - Sending email for order_id={order_id}\n"
             with open(LOG_PATH, "a") as f:
                 f.write(line)
+            logger.info(
+                "Email sent for order",
+                extra={"event": "email_sent", "order_id": order_id, "worker": "email", "status": "sent", "correlation_id": correlation_id},
+            )
             print(line.strip())
             # persist email log to database
             try:
@@ -66,11 +82,17 @@ def on_message(ch, method, properties, body):
                     db.commit()
                 finally:
                     db.close()
-            except Exception as db_exc:
-                print("Failed to persist email log:", db_exc)
+            except Exception:
+                logger.exception(
+                    "Failed to persist email log",
+                    extra={"event": "email_log_failure", "order_id": order_id, "worker": "email", "correlation_id": correlation_id},
+                )
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as exc:
-        print("Error processing message:", exc)
+        logger.exception(
+            "Error processing email message",
+            extra={"event": "email_processing_error", "worker": "email", "error": str(exc), "correlation_id": correlation_id},
+        )
         try:
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         except Exception:

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     RABBITMQ_RETRY_DELAY_MS: int = 5000
     RABBITMQ_MAX_RETRIES: int = 3
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

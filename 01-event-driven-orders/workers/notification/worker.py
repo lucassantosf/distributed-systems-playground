@@ -15,21 +15,37 @@ if ROOT not in sys.path:
 import pika
 
 from src.settings import settings
+from src.infrastructure.logging import configure_logging, get_logger
+
+configure_logging()
+logger = get_logger("workers.notification.worker")
 
 LOG_PATH = "/app/workers/notification/generated_notification.log"
 
 def on_message(ch, method, properties, body):
     try:
         payload = json.loads(body)
+        correlation_id = payload.get("correlation_id")
         if payload.get("event") == "order_created":
             order_id = payload.get("order_id")
+            logger.info(
+                "Processing order_created event",
+                extra={"event": "order_created", "order_id": order_id, "worker": "notification", "queue": settings.RABBITMQ_NOTIFICATION_QUEUE, "correlation_id": correlation_id},
+            )
             line = f"{datetime.utcnow().isoformat()} - Generating notification for order_id={order_id}\n"
             with open(LOG_PATH, "a") as f:
                 f.write(line)
+            logger.info(
+                "Notification generated for order",
+                extra={"event": "notification_generated", "order_id": order_id, "worker": "notification", "status": "generated", "correlation_id": correlation_id},
+            )
             print(line.strip())
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as exc:
-        print("Error processing message:", exc)
+        logger.exception(
+            "Error processing notification message",
+            extra={"event": "notification_processing_error", "worker": "notification", "error": str(exc), "correlation_id": correlation_id},
+        )
         try:
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         except Exception:

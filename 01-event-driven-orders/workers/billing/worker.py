@@ -15,6 +15,10 @@ if ROOT not in sys.path:
 import pika
 
 from src.settings import settings
+from src.infrastructure.logging import configure_logging, get_logger
+
+configure_logging()
+logger = get_logger("workers.billing.worker")
 
 LOG_PATH = "/app/workers/billing/generated_invoices.log"
 
@@ -38,11 +42,19 @@ def republish_to_retry(ch, body, headers, retry_queue):
 def on_message(ch, method, properties, body):
     try:
         payload = json.loads(body)
+        correlation_id = payload.get("correlation_id")
         if payload.get("event") == "order_created":
             order_id = payload.get("order_id")
             retry_count = get_retry_count(properties)
+            logger.info(
+                "Processing order_created event",
+                extra={"event": "order_created", "order_id": order_id, "worker": "billing", "queue": settings.RABBITMQ_BILLING_QUEUE, "retry_count": retry_count, "correlation_id": correlation_id},
+            )
             if retry_count < settings.RABBITMQ_MAX_RETRIES and order_id == 99:
-                print(f"Simulating failure for order_id={order_id}, retry_count={retry_count}")
+                logger.warning(
+                    "Simulating retryable billing failure",
+                    extra={"event": "order_created", "order_id": order_id, "worker": "billing", "retry_count": retry_count, "status": "retrying", "correlation_id": correlation_id},
+                )
                 republish_to_retry(ch, body, getattr(properties, "headers", None), settings.RABBITMQ_BILLING_RETRY_QUEUE)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
@@ -50,10 +62,17 @@ def on_message(ch, method, properties, body):
             line = f"{datetime.utcnow().isoformat()} - Generating invoice for order_id={order_id}\n"
             with open(LOG_PATH, "a") as f:
                 f.write(line)
+            logger.info(
+                "Invoice generated for order",
+                extra={"event": "invoice_generated", "order_id": order_id, "worker": "billing", "status": "generated", "correlation_id": correlation_id},
+            )
             print(line.strip())
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as exc:
-        print("Error processing message:", exc)
+        logger.exception(
+            "Error processing billing message",
+            extra={"event": "billing_processing_error", "worker": "billing", "error": str(exc), "correlation_id": correlation_id},
+        )
         try:
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
         except Exception:

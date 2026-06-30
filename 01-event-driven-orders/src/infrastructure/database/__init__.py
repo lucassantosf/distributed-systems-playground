@@ -12,6 +12,9 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 Base = declarative_base()
 
+from src.modules.orders.models import Order  # noqa: F401, E402
+from src.modules.email_logs.models import EmailLog  # noqa: F401, E402
+
 
 def init_db():
     """Create database tables from models (only for local/dev use).

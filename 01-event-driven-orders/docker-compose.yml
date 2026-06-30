@@ -24,6 +24,7 @@ services:
     volumes:
       - ./src:/app/src:rw
       - ./requirements.txt:/app/requirements.txt:ro
+      - ./logs:/app/logs:rw
     env_file:
       - .env
     environment:
@@ -67,6 +68,7 @@ services:
     command: python -u workers/email/worker.py
     volumes:
       - ./workers:/app/workers:rw
+      - ./logs:/app/logs:rw
 
   billing_worker:
     build:
@@ -81,6 +83,7 @@ services:
     command: python -u workers/billing/worker.py
     volumes:
       - ./workers:/app/workers:rw
+      - ./logs:/app/logs:rw
 
   notification_worker:
     build:
@@ -95,6 +98,7 @@ services:
     command: python -u workers/notification/worker.py
     volumes:
       - ./workers:/app/workers:rw
+      - ./logs:/app/logs:rw
 
 volumes:
   pgdata:
