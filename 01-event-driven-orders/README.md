@@ -1,8 +1,8 @@
 # 01 — Event-Driven Orders
 
-Projeto de estudo sobre **Arquitetura Orientada a Eventos** com FastAPI, PostgreSQL e RabbitMQ.
+API de pedidos orientada a eventos com FastAPI, PostgreSQL e RabbitMQ.
 
-A API publica eventos de pedidos que são consumidos por workers independentes (notificações, faturamento, e-mail). O foco inclui retries, Dead Letter Queues (DLQ), idempotência, logs estruturados e correlation IDs.
+Workers desacoplados consomem eventos de pedidos para notificação, faturamento e e-mail. O projeto explora retries, DLQ, idempotência, logs estruturados e correlation IDs.
 
 ## Stack
 
