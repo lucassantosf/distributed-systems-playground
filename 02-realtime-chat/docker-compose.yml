@@ -44,6 +44,7 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+      - backend_venv:/app/.venv
     command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
@@ -62,3 +63,4 @@ services:
 volumes:
   postgres_data:
   node_modules:
+  backend_venv:
