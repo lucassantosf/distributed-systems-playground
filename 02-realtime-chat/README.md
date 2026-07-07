@@ -3,394 +3,381 @@
 
 # TODO List 
 
-## Epic 1 — Fundação
+## Epic 1 — Fundação [OK]
 
-Objetivo:
+    Objetivo:
 
-Ter toda a infraestrutura funcionando.
+    Ter toda a infraestrutura funcionando.
 
-### Card 1
+    ### Card 1 [OK]
 
-Criar estrutura inicial do projeto
+    Criar estrutura inicial do projeto
 
-Entregável
+    Entregável
 
-Backend
-Frontend
-Docker Compose
+    Backend
+    Frontend
+    Docker Compose
 
-### Card 2
+    ### Card 2 [OK]
 
-Subir ambiente Docker
+    Subir ambiente Docker
 
-Serviços:
+    Serviços:
 
-FastAPI
-PostgreSQL
-Redis
+    FastAPI
+    PostgreSQL
+    Redis
 
-Validação
+    Validação
 
-Tudo sobe sem erros.
+    Tudo sobe sem erros.
 
-### Card 3
+    ### Card 3 [OK]
 
-Configurar banco de dados
+    Configurar banco de dados
 
-Criar conexão.
+    Criar conexão.
 
-Validação
+    Validação
 
-Aplicação conecta ao PostgreSQL.
+    Aplicação conecta ao PostgreSQL.
 
-## Epic 2 — Primeira Interface
+## Epic 2 — Primeira Interface [OK]
 
-Objetivo:
+    Objetivo:
 
-Ter uma interface mínima.
+    Ter uma interface mínima. 
 
+    ### Card 4 [OK]
 
-### Card 4
+    Criar tela inicial
 
-Criar tela inicial
+    Campos:
 
-Campos:
+    Username
+    Room
 
-Username
-Room
+    Botão:
 
-Botão:
+    Join Chat
 
-Join Chat
+    Validação
 
-Validação
+    Usuário entra na sala.
 
-Usuário entra na sala.
 
+    ### Card 5 [OK]
 
-### Card 5
+    Criar tela de conversa
 
-Criar tela de conversa
+    Elementos:
 
-Elementos:
+    Lista de mensagens
+    Campo de texto
+    Botão enviar
 
-Lista de mensagens
-Campo de texto
-Botão enviar
+    Sem WebSocket ainda.
 
-Sem WebSocket ainda.
+    Só layout.
 
-Só layout.
+## Epic 3 — Primeiro WebSocket [OK]
 
-## Epic 3 — Primeiro WebSocket
+    Objetivo:
 
-Objetivo:
+    Conseguir conectar. 
 
-Conseguir conectar.
+    ### Card 6 [OK]
 
+    Criar endpoint WebSocket
 
-### Card 6
+    Validação
 
-Criar endpoint WebSocket
+    Frontend conecta.
 
-Validação
+    ### Card 7 [OK]
 
-Frontend conecta.
+    Manter usuários conectados
 
+    Criar Connection Manager.
 
-### Card 7
+    Validação
 
-Manter usuários conectados
+    Servidor conhece os clientes ativos.
 
-Criar Connection Manager.
+    ### Card 8 [OK]
 
-Validação
+    Enviar mensagem para o servidor
 
-Servidor conhece os clientes ativos.
+    Fluxo
 
+    Frontend
 
-### Card 8
+    ↓
 
-Enviar mensagem para o servidor
+    WebSocket
 
-Fluxo
+    ↓
 
-Frontend
+    FastAPI
 
-↓
+    Validação
 
-WebSocket
+    Mensagem chega ao backend.
 
-↓
+## Epic 4 — Broadcast [*]
 
-FastAPI
+    Objetivo:
 
-Validação
+    Primeiro chat funcionando.
 
-Mensagem chega ao backend.
+    ### Card 9 [*]
 
-## Epic 4 — Broadcast
+    Enviar mensagem para todos
 
-Objetivo:
+    Fluxo
 
-Primeiro chat funcionando.
+    Cliente
 
+    ↓
 
-### Card 9
+    Servidor
 
-Enviar mensagem para todos
+    ↓
 
-Fluxo
+    Todos recebem
 
-Cliente
+    Validação
 
-↓
+    Abrir duas abas.
 
-Servidor
+    Enviar mensagem.
 
-↓
+    As duas recebem.
 
-Todos recebem
+    ### Card 10 [*]
 
-Validação
+    Adicionar username
 
-Abrir duas abas.
+    Mensagem:
 
-Enviar mensagem.
+    Lucas:
 
-As duas recebem.
+    Hello!
 
+    Validação
 
-### Card 10
+    Cada usuário aparece identificado.
 
-Adicionar username
+    ### Card 11 [*]
 
-Mensagem:
+    Criar salas
 
-Lucas:
+    Exemplo:
 
-Hello!
+    general
 
-Validação
+    python
 
-Cada usuário aparece identificado.
+    backend
 
+    Validação
 
-### Card 11
+    Cada sala recebe apenas suas mensagens.
 
-Criar salas
+## Epic 5 — Persistência [*]
 
-Exemplo:
+    Objetivo:
 
-general
+    Guardar histórico.
 
-python
+    ### Card 12 [*]
 
-backend
+    Criar entidade Message
 
-Validação
+    Campos:
 
-Cada sala recebe apenas suas mensagens.
+    id
 
-## Epic 5 — Persistência
+    room
 
-Objetivo:
+    username
 
-Guardar histórico.
+    content
 
+    created_at
 
-### Card 12
+    ### Card 13 [*]
 
-Criar entidade Message
+    Salvar mensagens
 
-Campos:
+    Validação
 
-id
+    Toda mensagem enviada vai para o banco.
 
-room
 
-username
+    ### Card 14 [*]
 
-content
+    Carregar histórico
 
-created_at
+    Fluxo
 
-### Card 13
+    Entrou na sala.
 
-Salvar mensagens
+    ↓
 
-Validação
+    Busca mensagens antigas.
 
-Toda mensagem enviada vai para o banco.
+    Validação
 
+    Histórico aparece.
 
-### Card 14
+## Epic 6 — Redis Pub/Sub [*]
 
-Carregar histórico
+    Objetivo:
 
-Fluxo
+    Entender por que Redis existe.
 
-Entrou na sala.
 
-↓
+    ### Card 15 [*]
 
-Busca mensagens antigas.
+    Publicar mensagens no Redis
 
-Validação
+    Fluxo
 
-Histórico aparece.
+    FastAPI
 
-## Epic 6 — Redis Pub/Sub
+    ↓
 
-Objetivo:
+    Redis Channel
 
-Entender por que Redis existe.
+    Validação
 
+    Mensagem publicada.
 
-### Card 15
+    ### Card 16 [*]
 
-Publicar mensagens no Redis
+    Consumir mensagens do Redis
 
-Fluxo
+    Fluxo
 
-FastAPI
+    Redis
 
-↓
+    ↓
 
-Redis Channel
+    Chat Server
 
-Validação
+    ↓
 
-Mensagem publicada.
+    WebSocket
 
+    Validação
 
-### Card 16
+    Mensagens chegam através do Pub/Sub.
 
-Consumir mensagens do Redis
+    Neste momento você entende que o WebSocket não precisa conversar diretamente entre instâncias.
 
-Fluxo
+## Epic 7 — Presença Online [*]
 
-Redis
+    Objetivo:
 
-↓
+    Saber quem está conectado.
 
-Chat Server
+    ### Card 17 [*]
 
-↓
+    Mostrar usuários online
 
-WebSocket
+    Validação
 
-Validação
+    Entrou.
 
-Mensagens chegam através do Pub/Sub.
+    ↓
 
-Neste momento você entende que o WebSocket não precisa conversar diretamente entre instâncias.
+    Lista atualiza.
 
-## Epic 7 — Presença Online
+    Saiu.
 
-Objetivo:
+    ↓
 
-Saber quem está conectado.
+    Lista atualiza.
 
+    ### Card 18 [*]
 
-### Card 17
+    Detectar desconexão
 
-Mostrar usuários online
+    Validação
 
-Validação
+    Fechar aba remove usuário.
 
-Entrou.
+## Epic 8 — Melhorias do Chat [*]
 
-↓
+    Objetivo:
 
-Lista atualiza.
+    Deixar parecido com um chat real.
 
-Saiu.
+    ### Card 19 [*]
 
-↓
+    Indicador de entrada e saída
 
-Lista atualiza.
+    Mensagens:
 
+    Lucas joined
 
-### Card 18
+    Lucas left
 
-Detectar desconexão
+    ### Card 20 [*]
 
-Validação
+    Timestamp das mensagens
 
-Fechar aba remove usuário.
+    Formato:
 
-## Epic 8 — Melhorias do Chat
+    14:32
 
-Objetivo:
+    ### Card 21 [*]
 
-Deixar parecido com um chat real.
+    Auto-scroll
 
+    Nova mensagem.
 
-### Card 19
+    ↓
 
-Indicador de entrada e saída
+    Tela acompanha.
 
-Mensagens:
+    ### Card 22 [*]
 
-Lucas joined
+    Diferenciar mensagens próprias
 
-Lucas left
+    Exemplo:
 
-### Card 20
+    Direita
+    Cor diferente
 
-Timestamp das mensagens
 
-Formato:
+## Epic 9 — Robustez [*]
 
-14:32
+    Objetivo:
 
-### Card 21
+    Pensar como sistema distribuído.
 
-Auto-scroll
+    ### Card 23 [*]
 
-Nova mensagem.
+    Reconectar automaticamente
 
-↓
+    Se WebSocket cair.
 
-Tela acompanha.
+    ↓
 
+    Reconecta.
 
-### Card 22
 
-Diferenciar mensagens próprias
+    ### Card 24 [*]
 
-Exemplo:
+    Heartbeat/Ping
 
-Direita
-Cor diferente
+    Servidor verifica clientes ativos.
 
-## Epic 9 — Robustez
 
-Objetivo:
-
-Pensar como sistema distribuído.
-
-
-### Card 23
-
-Reconectar automaticamente
-
-Se WebSocket cair.
-
-↓
-
-Reconecta.
-
-
-### Card 24
-
-Heartbeat/Ping
-
-Servidor verifica clientes ativos.
-
-
-### Card 25
+### Card 25 [*]
 
 Remover conexões inválidas
 
