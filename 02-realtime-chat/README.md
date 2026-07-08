@@ -125,13 +125,13 @@
 
     Mensagem chega ao backend.
 
-## Epic 4 — Broadcast [*]
+## Epic 4 — Broadcast [OK]
 
     Objetivo:
 
     Primeiro chat funcionando.
 
-    ### Card 9 [*]
+    ### Card 9 [OK]
 
     Enviar mensagem para todos
 
@@ -155,7 +155,7 @@
 
     As duas recebem.
 
-    ### Card 10 [*]
+    ### Card 10 [OK]
 
     Adicionar username
 
@@ -169,7 +169,7 @@
 
     Cada usuário aparece identificado.
 
-    ### Card 11 [*]
+    ### Card 11 [OK]
 
     Criar salas
 

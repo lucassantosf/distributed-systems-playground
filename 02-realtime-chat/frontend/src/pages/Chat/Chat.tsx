@@ -6,40 +6,16 @@ import { Message } from '../../types/message';
 import { Button } from '../../components/Button/Button';
 
 export const Chat: React.FC = () => {
-  const { username, room } = useParams<{ username: string; room: string }>();
   const navigate = useNavigate();
+  const storedUsername = sessionStorage.getItem('chat.username') ?? 'Guest';
+  const storedRoom = sessionStorage.getItem('chat.room') ?? 'general';
 
-  const decodedUsername = username ? decodeURIComponent(username) : 'Guest';
-  const decodedRoom = room ? decodeURIComponent(room) : 'general';
+  const decodedUsername = storedUsername;
+  const decodedRoom = storedRoom;
 
   const socketRef = useRef<WebSocket | null>(null);
   const pendingMessagesRef = useRef<string[]>([]);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      username: 'Alice',
-      content: 'Hey everyone! 👋',
-      timestamp: '14:30',
-    },
-    {
-      id: '2',
-      username: 'Bob',
-      content: 'Hi Alice! How are you?',
-      timestamp: '14:31',
-    },
-    {
-      id: '3',
-      username: 'Lucas',
-      content: 'Hello! Welcome to the chat',
-      timestamp: '14:32',
-    },
-    {
-      id: '4',
-      username: 'Alice',
-      content: 'Thanks! This is a great room',
-      timestamp: '14:33',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
@@ -67,10 +43,14 @@ export const Chat: React.FC = () => {
         return;
       }
 
+      const separatorIndex = messageText.indexOf(': ');
+      const sender = separatorIndex >= 0 ? messageText.slice(0, separatorIndex) : 'Server';
+      const content = separatorIndex >= 0 ? messageText.slice(separatorIndex + 2) : messageText;
+
       const newMessage: Message = {
         id: `${Date.now()}-${Math.random()}`,
-        username: 'Server',
-        content: messageText,
+        username: sender,
+        content,
         timestamp: new Date().toLocaleTimeString('pt-BR', {
           hour: '2-digit',
           minute: '2-digit',
@@ -106,6 +86,8 @@ export const Chat: React.FC = () => {
   };
 
   const handleLeaveRoom = () => {
+    sessionStorage.removeItem('chat.username');
+    sessionStorage.removeItem('chat.room');
     navigate('/');
   };
 

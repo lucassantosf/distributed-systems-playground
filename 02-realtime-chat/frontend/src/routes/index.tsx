@@ -8,7 +8,7 @@ export const router = createBrowserRouter([
     element: <Home />,
   },
   {
-    path: '/chat/:username/:room',
+    path: '/chat',
     element: <Chat />,
   },
 ]);

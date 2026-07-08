@@ -13,7 +13,9 @@ export const Home: React.FC = () => {
 
   const handleJoinChat = () => {
     if (formData.username.trim() && formData.room.trim()) {
-      navigate(`/chat/${encodeURIComponent(formData.username)}/${encodeURIComponent(formData.room)}`);
+      sessionStorage.setItem('chat.username', formData.username.trim());
+      sessionStorage.setItem('chat.room', formData.room.trim());
+      navigate('/chat');
     }
   };
 

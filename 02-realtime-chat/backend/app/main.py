@@ -36,18 +36,26 @@ async def rooms():
 @app.websocket("/ws/{room}/{username}")
 async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
     await websocket.accept()
-    await manager.add_connection(room, username)
-    await websocket.send_text(f"Connected to room: {room}")
-    await websocket.send_text(f"Active users: {', '.join(await manager.get_room_users(room))}")
+    await manager.add_connection(room, username, websocket)
 
     try:
+        await websocket.send_text(f"Connected to room: {room}")
+        await websocket.send_text(f"Active users: {', '.join(await manager.get_room_users(room))}")
+
         while True:
             message = await websocket.receive_text()
             logger.info("[ws][room=%s][user=%s] %s", room, username, message)
-            await websocket.send_text(f"[{room}] {message}")
+            await manager.broadcast(room, username, message)
     except WebSocketDisconnect:
         await manager.remove_connection(room, username)
-        print(f"Client disconnected from room {room}")
+        logger.info("Client disconnected from room %s", room)
+    except RuntimeError as exc:
+        if "disconnect" in str(exc).lower():
+            await manager.remove_connection(room, username)
+            logger.info("Client disconnected from room %s", room)
+        else:
+            raise
     except Exception as exc:
         await manager.remove_connection(room, username)
-        print(f"WebSocket error for room {room}: {exc}")
+        logger.exception("WebSocket error for room %s", room)
+        raise
