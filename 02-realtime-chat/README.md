@@ -191,7 +191,7 @@
 
     Guardar histórico.
 
-    ### Card 12 [*]
+    ### Card 12 [OK]
 
     Criar entidade Message
 

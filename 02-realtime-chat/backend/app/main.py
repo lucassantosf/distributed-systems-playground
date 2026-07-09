@@ -2,14 +2,19 @@ import logging
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from app.connection_manager import ConnectionManager
-from app.database import test_connection
+from app.infrastructure.database import ensure_schema, test_connection
+from app.services.message_service import MessageService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("chat")
 
 app = FastAPI()
 manager = ConnectionManager()
+message_service = MessageService()
 
+@app.on_event("startup")
+async def startup_event() -> None:
+    await ensure_schema()
 
 @app.get("/")
 async def root():
@@ -45,6 +50,7 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
         while True:
             message = await websocket.receive_text()
             logger.info("[ws][room=%s][user=%s] %s", room, username, message)
+            await message_service.persist_message(room=room, username=username, content=message)
             await manager.broadcast(room, username, message)
     except WebSocketDisconnect:
         await manager.remove_connection(room, username)
