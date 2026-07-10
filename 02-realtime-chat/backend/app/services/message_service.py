@@ -8,3 +8,6 @@ class MessageService:
 
     async def persist_message(self, *, room: str, username: str, content: str) -> Message:
         return await self.repository.create_message(room=room, username=username, content=content)
+
+    async def get_history(self, *, room: str) -> list[Message]:
+        return await self.repository.list_messages_by_room(room)

@@ -1,14 +1,23 @@
 import logging
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from app.connection_manager import ConnectionManager
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.infrastructure.database import ensure_schema, test_connection
+from app.services.connection_manager import ConnectionManager
 from app.services.message_service import MessageService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("chat")
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 manager = ConnectionManager()
 message_service = MessageService()
 
@@ -36,6 +45,21 @@ async def root():
 @app.get("/rooms")
 async def rooms():
     return await manager.get_all_rooms()
+
+
+@app.get("/history/{room}")
+async def get_history(room: str):
+    messages = await message_service.get_history(room=room)
+    return [
+        {
+            "id": message.id,
+            "room": message.room,
+            "username": message.username,
+            "content": message.content,
+            "created_at": message.created_at.isoformat(),
+        }
+        for message in messages
+    ]
 
 
 @app.websocket("/ws/{room}/{username}")

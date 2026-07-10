@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { MessageList } from '../../features/chat/components/MessageList';
 import { MessageInput } from '../../features/chat/components/MessageInput';
 import { Message } from '../../types/message';
@@ -20,6 +20,32 @@ export const Chat: React.FC = () => {
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
 
   useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const response = await fetch(`http://${window.location.hostname}:8000/history/${encodeURIComponent(decodedRoom)}`);
+        if (!response.ok) {
+          return;
+        }
+
+        const history = await response.json();
+        const formattedHistory: Message[] = history.map((item: any) => ({
+          id: String(item.id),
+          username: item.username,
+          content: item.content,
+          timestamp: new Date(item.created_at).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        }));
+
+        setMessages(formattedHistory);
+      } catch (error) {
+        console.error('Failed to load room history', error);
+      }
+    };
+
+    void loadHistory();
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(`${protocol}//${window.location.hostname}:8000/ws/${encodeURIComponent(decodedRoom)}/${encodeURIComponent(decodedUsername)}`);
     socketRef.current = socket;

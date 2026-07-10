@@ -207,14 +207,13 @@
 
     created_at
 
-    ### Card 13 [*]
+    ### Card 13 [OK]
 
     Salvar mensagens
 
     Validação
 
     Toda mensagem enviada vai para o banco.
-
 
     ### Card 14 [*]
 
