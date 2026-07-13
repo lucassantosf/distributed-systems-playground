@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.infrastructure.database import ensure_schema, test_connection
 from app.services.connection_manager import ConnectionManager
 from app.services.message_service import MessageService
+from app.services.redis_publisher import RedisPublisher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("chat")
@@ -20,6 +21,7 @@ app.add_middleware(
 )
 manager = ConnectionManager()
 message_service = MessageService()
+redis_publisher = RedisPublisher()
 
 @app.on_event("startup")
 async def startup_event() -> None:
@@ -74,7 +76,16 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
         while True:
             message = await websocket.receive_text()
             logger.info("[ws][room=%s][user=%s] %s", room, username, message)
-            await message_service.persist_message(room=room, username=username, content=message)
+            persisted_message = await message_service.persist_message(room=room, username=username, content=message)
+            await redis_publisher.publish_message(
+                room,
+                {
+                    "room": room,
+                    "username": username,
+                    "content": message,
+                    "message_id": persisted_message.id,
+                },
+            )
             await manager.broadcast(room, username, message)
     except WebSocketDisconnect:
         await manager.remove_connection(room, username)
