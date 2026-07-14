@@ -64,7 +64,11 @@ export const Chat: React.FC = () => {
     socket.addEventListener('message', (event) => {
       const messageText = event.data;
       if (messageText.startsWith('Active users:')) {
-        const users = messageText.replace('Active users:', '').split(',').map((user) => user.trim()).filter(Boolean);
+        const users = messageText
+          .replace('Active users:', '')
+          .split(',')
+          .map((user) => user.trim())
+          .filter(Boolean);
         setActiveUsers(users);
         return;
       }
@@ -82,7 +86,13 @@ export const Chat: React.FC = () => {
           minute: '2-digit',
         }),
       };
-      setMessages((currentMessages) => [...currentMessages, newMessage]);
+      setMessages((currentMessages) => {
+        const alreadyPresent = currentMessages.some((message) => message.content === content && message.username === sender && message.timestamp === newMessage.timestamp);
+        if (alreadyPresent) {
+          return currentMessages;
+        }
+        return [...currentMessages, newMessage];
+      });
     });
 
     socket.addEventListener('close', () => {
@@ -101,7 +111,17 @@ export const Chat: React.FC = () => {
 
   const handleSendMessage = (content: string) => {
     const socket = socketRef.current;
-    console.log('sending message', { content, readyState: socket?.readyState, status: connectionStatus });
+    const optimisticMessage: Message = {
+      id: `local-${Date.now()}`,
+      username: decodedUsername,
+      content,
+      timestamp: new Date().toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    };
+
+    setMessages((currentMessages) => [...currentMessages, optimisticMessage]);
 
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(content);

@@ -33,13 +33,18 @@ class ConnectionManager:
         async with self._lock:
             return {room: sorted(connections.keys()) for room, connections in self._rooms.items()}
 
-    async def broadcast(self, room: str, sender_username: str, message: str) -> None:
+    async def broadcast(self, room: str, sender_username: str, message: str, *, exclude_username: str | None = None) -> None:
+        await self.broadcast_text(room, f"{sender_username}: {message}", exclude_username=exclude_username)
+
+    async def broadcast_text(self, room: str, message: str, *, exclude_username: str | None = None) -> None:
         async with self._lock:
             room_connections = self._rooms.get(room, {})
             recipients = list(room_connections.items())
 
         for username, websocket in recipients:
+            if exclude_username is not None and username == exclude_username:
+                continue
             try:
-                await websocket.send_text(f"{sender_username}: {message}")
+                await websocket.send_text(message)
             except Exception:
                 await self.remove_connection(room, username)

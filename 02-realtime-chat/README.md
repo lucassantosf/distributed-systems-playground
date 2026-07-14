@@ -185,7 +185,7 @@
 
     Cada sala recebe apenas suas mensagens.
 
-## Epic 5 — Persistência [*]
+## Epic 5 — Persistência [OK]
 
     Objetivo:
 
@@ -215,7 +215,7 @@
 
     Toda mensagem enviada vai para o banco.
 
-    ### Card 14 [*]
+    ### Card 14 [OK]
 
     Carregar histórico
 
@@ -231,14 +231,13 @@
 
     Histórico aparece.
 
-## Epic 6 — Redis Pub/Sub [*]
+## Epic 6 — Redis Pub/Sub [OK]
 
     Objetivo:
 
     Entender por que Redis existe.
 
-
-    ### Card 15 [*]
+    ### Card 15 [OK]
 
     Publicar mensagens no Redis
 
@@ -254,7 +253,7 @@
 
     Mensagem publicada.
 
-    ### Card 16 [*]
+    ### Card 16 [OK]
 
     Consumir mensagens do Redis
 
@@ -282,7 +281,7 @@
 
     Saber quem está conectado.
 
-    ### Card 17 [*]
+    ### Card 17 [OK]
 
     Mostrar usuários online
 
@@ -300,7 +299,7 @@
 
     Lista atualiza.
 
-    ### Card 18 [*]
+    ### Card 18 [*]*******
 
     Detectar desconexão
 
