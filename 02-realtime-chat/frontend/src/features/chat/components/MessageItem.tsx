@@ -10,6 +10,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   message,
   isOwnMessage = false,
 }) => {
+  if (message.username === 'System') {
+    return (
+      <div className="message-system">
+        {message.content}
+      </div>
+    );
+  }
+
   return (
     <div className={`message-item ${isOwnMessage ? 'message-own' : 'message-other'}`}>
       <div className="message-header">

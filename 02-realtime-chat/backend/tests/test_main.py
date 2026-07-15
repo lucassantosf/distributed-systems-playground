@@ -54,6 +54,8 @@ class WebsocketFlowTests(unittest.IsolatedAsyncioTestCase):
         message_service.persist_message.assert_awaited_once_with(room="general", username="Alice", content="hello from the test")
         redis_publisher.publish_message.assert_awaited_once()
         manager.broadcast.assert_not_called()
+        manager.broadcast_text.assert_any_await("general", "System: Alice joined")
+        manager.broadcast_text.assert_any_await("general", "System: Alice left")
 
     async def test_join_updates_presence_for_new_and_existing_users(self) -> None:
         websocket = DummyWebSocket()
@@ -77,9 +79,35 @@ class WebsocketFlowTests(unittest.IsolatedAsyncioTestCase):
         ):
             await websocket_endpoint(websocket, room="general", username="Bob")
 
-        manager.get_room_users.assert_awaited_once_with("general")
-        manager.broadcast_text.assert_awaited_once_with("general", "Active users: Alice, Bob", exclude_username="Bob")
         self.assertIn("Active users: Alice, Bob", websocket.sent_messages)
+        manager.broadcast_text.assert_any_await("general", "System: Bob joined")
+        manager.broadcast_text.assert_any_await("general", "System: Bob left")
+
+    async def test_disconnect_broadcasts_updated_user_list(self) -> None:
+        websocket = DummyWebSocket()
+        manager = MagicMock()
+        manager.add_connection = AsyncMock()
+        manager.remove_connection = AsyncMock()
+        manager.get_room_users = AsyncMock(return_value=["Alice"])
+        manager.broadcast = AsyncMock()
+        manager.broadcast_text = AsyncMock()
+
+        message_service = MagicMock()
+        message_service.persist_message = AsyncMock(return_value=SimpleNamespace(id=42))
+
+        redis_publisher = MagicMock()
+        redis_publisher.publish_message = AsyncMock()
+
+        with (
+            patch("app.main.manager", manager),
+            patch("app.main.message_service", message_service),
+            patch("app.main.redis_publisher", redis_publisher),
+        ):
+            await websocket_endpoint(websocket, room="general", username="Alice")
+
+        manager.remove_connection.assert_awaited_once_with("general", "Alice")
+        manager.broadcast_text.assert_any_await("general", "Active users: Alice")
+        manager.broadcast_text.assert_any_await("general", "System: Alice left")
 
 
 if __name__ == "__main__":

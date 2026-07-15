@@ -27,7 +27,7 @@ export const Home: React.FC = () => {
         <h1 className="home-title">Join Chat</h1>
         <p className="home-subtitle">Enter your details to join a room</p>
 
-        <div className="home-form">
+        <form className="home-form" onSubmit={(e) => { e.preventDefault(); handleJoinChat(); }}>
           <Input
             label="Username"
             placeholder="Enter your username"
@@ -43,13 +43,12 @@ export const Home: React.FC = () => {
           />
 
           <Button
-            onClick={handleJoinChat}
             disabled={!isFormValid}
             type="submit"
           >
             Join Chat
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );

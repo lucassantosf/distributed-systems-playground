@@ -84,6 +84,8 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
             exclude_username=username,
         )
 
+        await manager.broadcast_text(room, f"System: {username} joined")
+
         while True:
             message = await websocket.receive_text()
             logger.info("[ws][room=%s][user=%s] %s", room, username, message)
@@ -100,13 +102,27 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
     except WebSocketDisconnect:
         await manager.remove_connection(room, username)
         logger.info("Client disconnected from room %s", room)
+        await _broadcast_updated_users(room)
+        await manager.broadcast_text(room, f"System: {username} left")
     except RuntimeError as exc:
         if "disconnect" in str(exc).lower():
             await manager.remove_connection(room, username)
             logger.info("Client disconnected from room %s", room)
+            await _broadcast_updated_users(room)
+            await manager.broadcast_text(room, f"System: {username} left")
         else:
             raise
     except Exception as exc:
         await manager.remove_connection(room, username)
         logger.exception("WebSocket error for room %s", room)
+        await _broadcast_updated_users(room)
+        await manager.broadcast_text(room, f"System: {username} left")
         raise
+
+
+async def _broadcast_updated_users(room: str) -> None:
+    room_users = await manager.get_room_users(room)
+    await manager.broadcast_text(
+        room,
+        f"Active users: {', '.join(room_users)}",
+    )

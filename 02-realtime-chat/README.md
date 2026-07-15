@@ -275,7 +275,7 @@
 
     Neste momento você entende que o WebSocket não precisa conversar diretamente entre instâncias.
 
-## Epic 7 — Presença Online [*]
+## Epic 7 — Presença Online [OK]
 
     Objetivo:
 
@@ -299,7 +299,7 @@
 
     Lista atualiza.
 
-    ### Card 18 [*]*******
+    ### Card 18 [OK]
 
     Detectar desconexão
 
@@ -307,13 +307,13 @@
 
     Fechar aba remove usuário.
 
-## Epic 8 — Melhorias do Chat [*]
+## Epic 8 — Melhorias do Chat [OK]
 
     Objetivo:
 
     Deixar parecido com um chat real.
 
-    ### Card 19 [*]
+    ### Card 19 [OK]
 
     Indicador de entrada e saída
 
@@ -323,7 +323,7 @@
 
     Lucas left
 
-    ### Card 20 [*]
+    ### Card 20 [OK]
 
     Timestamp das mensagens
 
@@ -331,7 +331,7 @@
 
     14:32
 
-    ### Card 21 [*]
+    ### Card 21 [OK]
 
     Auto-scroll
 
@@ -341,7 +341,7 @@
 
     Tela acompanha.
 
-    ### Card 22 [*]
+    ### Card 22 [OK]
 
     Diferenciar mensagens próprias
 
@@ -366,7 +366,6 @@
     ↓
 
     Reconecta.
-
 
     ### Card 24 [*]
 

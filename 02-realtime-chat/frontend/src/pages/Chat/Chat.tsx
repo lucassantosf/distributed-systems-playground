@@ -15,6 +15,7 @@ export const Chat: React.FC = () => {
 
   const socketRef = useRef<WebSocket | null>(null);
   const pendingMessagesRef = useRef<string[]>([]);
+  const chatContentRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
@@ -109,6 +110,13 @@ export const Chat: React.FC = () => {
     };
   }, [decodedRoom, decodedUsername]);
 
+  useEffect(() => {
+    const container = chatContentRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
+
   const handleSendMessage = (content: string) => {
     const socket = socketRef.current;
     const optimisticMessage: Message = {
@@ -150,7 +158,7 @@ export const Chat: React.FC = () => {
         </Button>
       </div>
 
-      <div className="chat-content">
+      <div className="chat-content" ref={chatContentRef}>
         <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #e5e7eb' }}>
           <strong>Active users:</strong> {activeUsers.length > 0 ? activeUsers.join(', ') : 'None'}
         </div>

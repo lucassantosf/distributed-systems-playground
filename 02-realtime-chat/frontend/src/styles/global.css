@@ -177,6 +177,14 @@ body {
   color: #333;
 }
 
+.message-system {
+  align-self: center;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  padding: 4px 0;
+}
+
 .message-header {
   display: flex;
   justify-content: space-between;
