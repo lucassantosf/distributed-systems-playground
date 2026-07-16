@@ -1,438 +1,219 @@
-
-
-
-# TODO List 
-
-## Epic 1 — Fundação [OK]
-
-    Objetivo:
-
-    Ter toda a infraestrutura funcionando.
-
-    ### Card 1 [OK]
-
-    Criar estrutura inicial do projeto
-
-    Entregável
-
-    Backend
-    Frontend
-    Docker Compose
-
-    ### Card 2 [OK]
-
-    Subir ambiente Docker
-
-    Serviços:
-
-    FastAPI
-    PostgreSQL
-    Redis
-
-    Validação
-
-    Tudo sobe sem erros.
-
-    ### Card 3 [OK]
-
-    Configurar banco de dados
-
-    Criar conexão.
-
-    Validação
-
-    Aplicação conecta ao PostgreSQL.
-
-## Epic 2 — Primeira Interface [OK]
-
-    Objetivo:
-
-    Ter uma interface mínima. 
-
-    ### Card 4 [OK]
-
-    Criar tela inicial
-
-    Campos:
-
-    Username
-    Room
-
-    Botão:
-
-    Join Chat
-
-    Validação
-
-    Usuário entra na sala.
-
-
-    ### Card 5 [OK]
-
-    Criar tela de conversa
-
-    Elementos:
-
-    Lista de mensagens
-    Campo de texto
-    Botão enviar
-
-    Sem WebSocket ainda.
-
-    Só layout.
-
-## Epic 3 — Primeiro WebSocket [OK]
-
-    Objetivo:
-
-    Conseguir conectar. 
-
-    ### Card 6 [OK]
-
-    Criar endpoint WebSocket
-
-    Validação
-
-    Frontend conecta.
-
-    ### Card 7 [OK]
-
-    Manter usuários conectados
-
-    Criar Connection Manager.
-
-    Validação
-
-    Servidor conhece os clientes ativos.
-
-    ### Card 8 [OK]
-
-    Enviar mensagem para o servidor
-
-    Fluxo
-
-    Frontend
-
-    ↓
-
-    WebSocket
-
-    ↓
-
-    FastAPI
-
-    Validação
-
-    Mensagem chega ao backend.
-
-## Epic 4 — Broadcast [OK]
-
-    Objetivo:
-
-    Primeiro chat funcionando.
-
-    ### Card 9 [OK]
-
-    Enviar mensagem para todos
-
-    Fluxo
-
-    Cliente
-
-    ↓
-
-    Servidor
-
-    ↓
-
-    Todos recebem
-
-    Validação
-
-    Abrir duas abas.
-
-    Enviar mensagem.
-
-    As duas recebem.
-
-    ### Card 10 [OK]
-
-    Adicionar username
-
-    Mensagem:
-
-    Lucas:
-
-    Hello!
-
-    Validação
-
-    Cada usuário aparece identificado.
-
-    ### Card 11 [OK]
-
-    Criar salas
-
-    Exemplo:
-
-    general
-
-    python
-
-    backend
-
-    Validação
-
-    Cada sala recebe apenas suas mensagens.
-
-## Epic 5 — Persistência [OK]
-
-    Objetivo:
-
-    Guardar histórico.
-
-    ### Card 12 [OK]
-
-    Criar entidade Message
-
-    Campos:
-
-    id
-
-    room
-
-    username
-
-    content
-
-    created_at
-
-    ### Card 13 [OK]
-
-    Salvar mensagens
-
-    Validação
-
-    Toda mensagem enviada vai para o banco.
-
-    ### Card 14 [OK]
-
-    Carregar histórico
-
-    Fluxo
-
-    Entrou na sala.
-
-    ↓
-
-    Busca mensagens antigas.
-
-    Validação
-
-    Histórico aparece.
-
-## Epic 6 — Redis Pub/Sub [OK]
-
-    Objetivo:
-
-    Entender por que Redis existe.
-
-    ### Card 15 [OK]
-
-    Publicar mensagens no Redis
-
-    Fluxo
-
-    FastAPI
-
-    ↓
-
-    Redis Channel
-
-    Validação
-
-    Mensagem publicada.
-
-    ### Card 16 [OK]
-
-    Consumir mensagens do Redis
-
-    Fluxo
-
-    Redis
-
-    ↓
-
-    Chat Server
-
-    ↓
-
-    WebSocket
-
-    Validação
-
-    Mensagens chegam através do Pub/Sub.
-
-    Neste momento você entende que o WebSocket não precisa conversar diretamente entre instâncias.
-
-## Epic 7 — Presença Online [OK]
-
-    Objetivo:
-
-    Saber quem está conectado.
-
-    ### Card 17 [OK]
-
-    Mostrar usuários online
-
-    Validação
-
-    Entrou.
-
-    ↓
-
-    Lista atualiza.
-
-    Saiu.
-
-    ↓
-
-    Lista atualiza.
-
-    ### Card 18 [OK]
-
-    Detectar desconexão
-
-    Validação
-
-    Fechar aba remove usuário.
-
-## Epic 8 — Melhorias do Chat [OK]
-
-    Objetivo:
-
-    Deixar parecido com um chat real.
-
-    ### Card 19 [OK]
-
-    Indicador de entrada e saída
-
-    Mensagens:
-
-    Lucas joined
-
-    Lucas left
-
-    ### Card 20 [OK]
-
-    Timestamp das mensagens
-
-    Formato:
-
-    14:32
-
-    ### Card 21 [OK]
-
-    Auto-scroll
-
-    Nova mensagem.
-
-    ↓
-
-    Tela acompanha.
-
-    ### Card 22 [OK]
-
-    Diferenciar mensagens próprias
-
-    Exemplo:
-
-    Direita
-    Cor diferente
-
-
-## Epic 9 — Robustez [*]
-
-    Objetivo:
-
-    Pensar como sistema distribuído.
-
-    ### Card 23 [*]
-
-    Reconectar automaticamente
-
-    Se WebSocket cair.
-
-    ↓
-
-    Reconecta.
-
-    ### Card 24 [*]
-
-    Heartbeat/Ping
-
-    Servidor verifica clientes ativos.
-
-
-### Card 25 [*]
-
-Remover conexões inválidas
-
-Validação
-
-Servidor limpa conexões mortas.
-
-Projeto Final
-
-Quando tudo estiver pronto, o fluxo será:
-
-Usuário abre aplicação
-
-↓
-
-Escolhe username
-
-↓
-
-Escolhe sala
-
-↓
-
-Conecta via WebSocket
-
-↓
-
-Servidor registra conexão
-
-↓
-
-Mensagem enviada
-
-↓
-
-Persistida no PostgreSQL
-
-↓
-
-Publicada no Redis
-
-↓
-
-Recebida por todos da sala
-
-↓
-
-Frontend atualiza em tempo real
-O que você aprenderá (sem perceber)
-
-Esse projeto parece um "chat", mas na verdade ele ensina vários conceitos fundamentais:
-
-✅ WebSockets e comunicação full-duplex.
-✅ Gerenciamento de conexões persistentes.
-✅ Broadcast de mensagens.
-✅ Salas (rooms) e isolamento de comunicação.
-✅ Persistência de histórico.
-✅ Redis Pub/Sub como mecanismo de distribuição.
-✅ Diferença entre comunicação síncrona (HTTP) e assíncrona (WebSocket).
-✅ Reconexão, heartbeat e limpeza de conexões inativas.
-✅ Separação entre interface e backend em uma aplicação em tempo real.
+# Realtime Chat
+
+Chat em tempo real construído como projeto de estudo de sistemas distribuídos. O usuário entra com um username e uma sala, e todas as mensagens são entregues em tempo real para todos os participantes da sala.
+
+## Tech Stack
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Frontend | React + TypeScript + Vite |
+| Backend | Python + FastAPI + WebSocket |
+| Banco de dados | PostgreSQL |
+| Cache / Pub/Sub | Redis |
+| Infraestrutura | Docker Compose |
+
+## Pré-requisitos
+
+- [Docker](https://docs.docker.com/get-docker/) e Docker Compose
+- Git
+
+## Como rodar
+
+```bash
+# Clone o repositório
+git clone <url-do-repositorio>
+cd distributed-systems-playground/02-realtime-chat
+
+# Suba todos os serviços
+docker compose up --build
+```
+
+Aguardar até todos os serviços estarem prontos. Você verá no terminal:
+
+| Serviço | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
+
+### Verificar se está rodando
+
+```bash
+# Testar o backend
+curl http://localhost:8000/
+
+# Ver logs em tempo real
+docker compose logs -f
+```
+
+### Parar os serviços
+
+```bash
+docker compose down
+```
+
+### Limpar dados (banco e volumes)
+
+```bash
+docker compose down -v
+```
+
+## Como usar
+
+1. Acesse http://localhost:5173
+2. Digite um **Username** e uma **Room**
+3. Clique em **Join Chat** (ou pressione Enter)
+4. Abra outra aba no navegador com a mesma sala para testar com dois usuários
+5. Envie mensagens — elas aparecem em tempo real em todas as abas
+
+## Funcionalidades
+
+- Salas de chat isoladas (rooms)
+- Mensagens em tempo real via WebSocket
+- Histórico de mensagens persistido no PostgreSQL
+- Lista de usuários online na sala
+- Indicadores de entrada e saída (`Lucas joined` / `Lucas left`)
+- Mensagens próprias diferenciadas (cor e posição)
+- Auto-scroll na lista de mensagens
+- Reconexão automática com backoff exponencial
+- Heartbeat do servidor para detectar conexões mortas
+- Pub/Sub via Redis para distribuição de mensagens
+
+## Arquitetura (visão geral)
+
+```
+┌──────────┐    WebSocket    ┌──────────┐    SQL     ┌────────────┐
+│ Frontend │◄───────────────►│ Backend  │◄──────────►│ PostgreSQL │
+│  (React) │                 │ (FastAPI)│            └────────────┘
+└──────────┘                 └────┬─────┘
+                                  │ Pub/Sub
+                                  ▼
+                            ┌──────────┐
+                            │  Redis   │
+                            └──────────┘
+```
+
+**Fluxo de uma mensagem:**
+
+1. Usuário envia mensagem pelo frontend
+2. Backend recebe via WebSocket
+3. Mensagem é persistida no PostgreSQL
+4. Mensagem é publicada no Redis (canal da sala)
+5. Subscriber recebe do Redis e broadcasta para todos da sala via WebSocket
+6. Frontend atualiza a interface em tempo real
+
+## Estrutura do projeto
+
+```
+02-realtime-chat/
+├── docker-compose.yml
+├── backend/
+│   ├── app/
+│   │   ├── main.py              # Ponto de entrada, rotas e WebSocket
+│   │   ├── config.py            # Configurações (DB, Redis)
+│   │   ├── domain/              # Entidades de negócio
+│   │   ├── infrastructure/      # Conexão com banco de dados
+│   │   ├── repositories/        # Acesso a dados
+│   │   └── services/            # Lógica de aplicação
+│   └── tests/
+└── frontend/
+    └── src/
+        ├── pages/               # Tela inicial e chat
+        ├── features/chat/       # Componentes do chat
+        ├── components/          # Componentes reutilizáveis
+        ├── types/               # Interfaces TypeScript
+        └── styles/              # CSS global
+```
+
+## Comandos úteis
+
+```bash
+# Logs de um serviço específico
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Reiniciar apenas o backend (após mudanças no código)
+docker compose restart backend
+
+# Rodar testes do backend
+docker compose exec backend uv run python -m unittest discover tests -v
+
+# Acessar o shell do container
+docker compose exec backend bash
+docker compose exec frontend sh
+```
+
+---
+
+## TODO List — Cards de desenvolvimento
+
+### Epic 1 — Fundação [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 1 | Criar estrutura inicial do projeto | OK |
+| 2 | Subir ambiente Docker (FastAPI, PostgreSQL, Redis) | OK |
+| 3 | Configurar banco de dados | OK |
+
+### Epic 2 — Primeira Interface [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 4 | Criar tela inicial (Username, Room, Join Chat) | OK |
+| 5 | Criar tela de conversa (layout sem WebSocket) | OK |
+
+### Epic 3 — Primeiro WebSocket [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 6 | Criar endpoint WebSocket | OK |
+| 7 | Manter usuários conectados (Connection Manager) | OK |
+| 8 | Enviar mensagem para o servidor | OK |
+
+### Epic 4 — Broadcast [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 9 | Enviar mensagem para todos | OK |
+| 10 | Adicionar username às mensagens | OK |
+| 11 | Criar salas (rooms) | OK |
+
+### Epic 5 — Persistência [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 12 | Criar entidade Message | OK |
+| 13 | Salvar mensagens no PostgreSQL | OK |
+| 14 | Carregar histórico ao entrar na sala | OK |
+
+### Epic 6 — Redis Pub/Sub [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 15 | Publicar mensagens no Redis | OK |
+| 16 | Consumir mensagens do Redis | OK |
+
+### Epic 7 — Presença Online [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 17 | Mostrar usuários online | OK |
+| 18 | Detectar desconexão | OK |
+
+### Epic 8 — Melhorias do Chat [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 19 | Indicador de entrada e saída (joined/left) | OK |
+| 20 | Timestamp das mensagens (HH:MM) | OK |
+| 21 | Auto-scroll na lista de mensagens | OK |
+| 22 | Diferenciar mensagens próprias (cor e posição) | OK |
+
+### Epic 9 — Robustez [OK]
+
+| Card | Descrição | Status |
+|------|-----------|--------|
+| 23 | Reconexão automática com backoff | OK |
+| 24 | Heartbeat/Ping do servidor | OK |
+| 25 | Remoção de conexões mortas | OK |

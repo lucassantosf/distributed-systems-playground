@@ -8,10 +8,10 @@ from app.main import websocket_endpoint
 
 
 class DummyWebSocket:
-    def __init__(self) -> None:
+    def __init__(self, messages: list[str] | None = None) -> None:
         self.accepted = False
         self.sent_messages: list[str] = []
-        self._messages = ["hello from the test"]
+        self._messages = messages or ["hello from the test"]
         self._calls = 0
 
     async def accept(self) -> None:
@@ -19,8 +19,8 @@ class DummyWebSocket:
 
     async def receive_text(self) -> str:
         self._calls += 1
-        if self._calls == 1:
-            return self._messages[0]
+        if self._calls <= len(self._messages):
+            return self._messages[self._calls - 1]
         raise WebSocketDisconnect()
 
     async def send_text(self, data: str) -> None:
@@ -108,6 +108,33 @@ class WebsocketFlowTests(unittest.IsolatedAsyncioTestCase):
         manager.remove_connection.assert_awaited_once_with("general", "Alice")
         manager.broadcast_text.assert_any_await("general", "Active users: Alice")
         manager.broadcast_text.assert_any_await("general", "System: Alice left")
+
+    async def test_pong_updates_last_pong_without_persisting(self) -> None:
+        websocket = DummyWebSocket(messages=['{"type": "pong"}'])
+        manager = MagicMock()
+        manager.add_connection = AsyncMock()
+        manager.remove_connection = AsyncMock()
+        manager.update_pong = AsyncMock()
+        manager.get_room_users = AsyncMock(return_value=["Alice"])
+        manager.broadcast = AsyncMock()
+        manager.broadcast_text = AsyncMock()
+
+        message_service = MagicMock()
+        message_service.persist_message = AsyncMock(return_value=SimpleNamespace(id=42))
+
+        redis_publisher = MagicMock()
+        redis_publisher.publish_message = AsyncMock()
+
+        with (
+            patch("app.main.manager", manager),
+            patch("app.main.message_service", message_service),
+            patch("app.main.redis_publisher", redis_publisher),
+        ):
+            await websocket_endpoint(websocket, room="general", username="Alice")
+
+        manager.update_pong.assert_awaited_once_with("general", "Alice")
+        message_service.persist_message.assert_not_called()
+        redis_publisher.publish_message.assert_not_called()
 
 
 if __name__ == "__main__":

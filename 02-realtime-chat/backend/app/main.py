@@ -1,3 +1,5 @@
+import asyncio
+import json
 import logging
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -29,6 +31,7 @@ redis_subscriber = RedisSubscriber(manager)
 async def startup_event() -> None:
     await ensure_schema()
     await redis_subscriber.start()
+    asyncio.create_task(manager.start_heartbeat())
 
 @app.get("/")
 async def root():
@@ -89,6 +92,15 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
         while True:
             message = await websocket.receive_text()
             logger.info("[ws][room=%s][user=%s] %s", room, username, message)
+
+            try:
+                data = json.loads(message)
+                if data.get("type") == "pong":
+                    await manager.update_pong(room, username)
+                    continue
+            except json.JSONDecodeError:
+                pass
+
             persisted_message = await message_service.persist_message(room=room, username=username, content=message)
             await redis_publisher.publish_message(
                 room,

@@ -148,6 +148,25 @@ body {
   gap: 12px;
 }
 
+.connection-banner {
+  padding: 10px 24px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.banner-reconnecting {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-bottom: 1px solid #fcd34d;
+}
+
+.banner-error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-bottom: 1px solid #fca5a5;
+}
+
 .message-list {
   display: flex;
   flex-direction: column;

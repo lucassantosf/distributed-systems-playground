@@ -1,322 +1,119 @@
-# Frontend Architecture Guidelines
+# Frontend
 
-Este projeto adota uma estrutura baseada em **responsabilidade**, onde cada pasta possui um propósito bem definido. A organização deve evoluir conforme a aplicação cresce, evitando complexidade desnecessária e mantendo o código fácil de navegar.
+Interface do chat em tempo real construída com React e TypeScript. Conecta ao backend via WebSocket e renderiza mensagens, presença de usuários e indicadores de sistema em tempo real.
 
-## Estrutura Inicial
+## Estrutura
 
 ```text
 frontend/
-│
-├── public/
-│
-├── src/
-│   ├── assets/
-│   ├── components/
-│   ├── features/
-│   ├── hooks/
-│   ├── layouts/
-│   ├── pages/
-│   ├── routes/
-│   ├── services/
-│   ├── types/
-│   ├── utils/
-│   ├── App.tsx
-│   └── main.tsx
-│
+├── index.html
 ├── package.json
 ├── vite.config.ts
-└── tsconfig.json
+├── tsconfig.json
+├── public/
+│   ├── favicon.svg
+│   └── icons.svg
+└── src/
+    ├── main.tsx                     # Ponto de entrada React
+    ├── routes/
+    │   └── index.tsx                # Rotas: / → Home, /chat → Chat
+    ├── pages/
+    │   ├── Home/
+    │   │   └── Home.tsx             # Tela de entrada (username + room)
+    │   └── Chat/
+    │       └── Chat.tsx             # Tela principal do chat
+    ├── features/
+    │   └── chat/
+    │       └── components/
+    │           ├── MessageInput.tsx  # Campo de texto + botão enviar
+    │           ├── MessageItem.tsx   # Renderização de uma mensagem
+    │           └── MessageList.tsx   # Lista de mensagens
+    ├── components/
+    │   ├── Button/
+    │   │   └── Button.tsx           # Botão reutilizável
+    │   └── Input/
+    │       └── Input.tsx            # Campo de input reutilizável
+    ├── types/
+    │   ├── chat.ts                  # JoinChatFormData
+    │   └── message.ts               # Message
+    └── styles/
+        └── global.css               # Estilos globais da aplicação
 ```
 
----
-
-# Diretórios
-
-## `assets/`
-
-Arquivos estáticos da aplicação.
-
-**Exemplos:**
-
-```text
-assets/
-├── images/
-├── icons/
-└── logo.svg
-```
-
-**Responsabilidade**
-
-* Imagens
-* Ícones
-* Fontes
-* Arquivos estáticos
-
-> Não deve conter nenhuma lógica da aplicação.
-
----
-
-## `components/`
-
-Componentes reutilizáveis em qualquer parte do sistema.
-
-**Exemplo:**
-
-```text
-components/
-├── Button/
-│   └── Button.tsx
-├── Modal/
-│   └── Modal.tsx
-└── Avatar/
-    └── Avatar.tsx
-```
-
-Utilize esta pasta apenas quando o componente puder ser reutilizado por múltiplas telas ou funcionalidades.
-
----
-
-## `features/`
-
-Agrupa tudo que pertence a uma funcionalidade específica da aplicação.
-
-Exemplo para este projeto:
-
-```text
-features/
-├── chat/
-│   ├── components/
-│   ├── hooks/
-│   └── services/
-│
-├── auth/
-│   ├── components/
-│   └── hooks/
-│
-└── notifications/
-```
-
-Esta abordagem mantém cada funcionalidade isolada e evita espalhar arquivos relacionados por toda a aplicação.
-
----
-
-## `pages/`
-
-Representa as páginas (screens) da aplicação.
-
-**Exemplo:**
-
-```text
-pages/
-├── Login/
-├── Chat/
-└── Settings/
-```
-
-As páginas devem ser responsáveis por montar os componentes da interface.
-
-Evite concentrar regras de negócio nesta camada.
-
----
-
-## `layouts/`
-
-Layouts reutilizáveis compartilhados entre páginas.
-
-**Exemplo:**
-
-```text
-layouts/
-├── MainLayout.tsx
-└── AuthLayout.tsx
-```
-
----
-
-## `hooks/`
-
-Hooks customizados reutilizáveis.
-
-**Exemplo:**
-
-```text
-hooks/
-├── useChat.ts
-├── usePresence.ts
-└── useWebSocket.ts
-```
-
-Caso um hook seja utilizado exclusivamente por uma feature, prefira mantê-lo dentro da própria feature.
-
----
-
-## `services/`
-
-Responsável pela comunicação com sistemas externos.
-
-**Exemplo inicial:**
-
-```text
-services/
-└── websocket.ts
-```
-
-Possível evolução:
-
-```text
-services/
-├── api.ts
-├── auth.ts
-└── websocket.ts
-```
-
-Esta camada deve conter:
-
-* Chamadas HTTP
-* WebSockets
-* Integrações externas
-
-Nunca componentes visuais.
-
----
-
-## `routes/`
-
-Configuração das rotas da aplicação.
-
-Exemplo:
-
-```text
-routes/
-└── index.tsx
-```
-
----
-
-## `types/`
-
-Tipos e interfaces compartilhadas.
-
-```text
-types/
-├── chat.ts
-├── user.ts
-└── websocket.ts
-```
-
-Centralizar os tipos evita duplicação e facilita manutenção.
-
----
-
-## `utils/`
-
-Funções utilitárias independentes da interface.
-
-**Exemplo:**
-
-```text
-utils/
-├── constants.ts
-├── formatDate.ts
-└── generateId.ts
-```
-
-Devem ser funções puras e reutilizáveis.
-
----
-
-# Convenções
+## Páginas
+
+### Home (`/`)
+Formulário de entrada com campos **Username** e **Room**. Suporta Enter para submeter. Valida que ambos os campos estejam preenchidos antes de permitir o join.
+
+### Chat (`/chat`)
+Tela principal do chat. Responsável por:
+- Conexão WebSocket com o backend
+- Envio e recebimento de mensagens em tempo real
+- Exibição de usuários online
+- Indicadores de joined/left
+- Reconexão automática com backoff exponencial
+- Auto-scroll na lista de mensagens
+- Banner de status de conexão (conectando / reconectando / desconectado)
 
 ## Componentes
 
-Utilizar **PascalCase**.
+| Componente | Responsabilidade |
+|------------|-----------------|
+| `MessageInput` | Campo de texto + botão enviar. Emite `onSendMessage` ao submeter. |
+| `MessageItem` | Renderiza uma mensagem. Diferencia mensagens próprias (cor azul, alinhada à direita), de outros usuários e do sistema (centralizada, cinza). |
+| `MessageList` | Lista iterando sobre `MessageItem`. |
+| `Button` | Botão reutilizável com estados `disabled` e `type`. |
+| `Input` | Campo de input reutilizável com label e placeholder. |
 
-✅ Correto
+## Conexão WebSocket
 
-```text
-Button.tsx
-ChatMessage.tsx
-UserAvatar.tsx
+A conexão é gerenciada dentro de `Chat.tsx` via `useEffect`:
+
+1. **Conexão**: `ws://{host}:8000/ws/{room}/{username}`
+2. **Mensagens recebidas**:
+   - `Active users: ...` → atualiza lista de online
+   - `{"type": "ping"}` → responde com `{"type": "pong"}`
+   - `{user}: {text}` → adiciona à lista de mensagens
+3. **Reconexão**: backoff exponencial (3s, 6s, 12s...) com máximo de 10 tentativas
+4. **Cleanup**: fecha o WebSocket ao desmontar o componente
+
+## Mensagens do sistema
+
+Mensagens com `username === "System"` são renderizadas de forma diferente:
+- Centralizadas
+- Sem header (username/timestamp)
+- Cor cinza (`#9ca3af`)
+- Fonte menor
+
+Exemplos: `Lucas joined`, `Lucas left`
+
+## Convenções
+
+- Componentes em **PascalCase** (`MessageItem.tsx`)
+- Hooks com prefixo `use` (`useChat.ts`)
+- Types em minúsculo relacionados ao domínio (`chat.ts`, `message.ts`)
+- Componentes reutilizáveis em `components/`
+- Componentes específicos de feature em `features/<feature>/`
+- Comunicação com APIs e WebSockets em `services/`
+
+## Comandos
+
+```bash
+# Instalar dependências
+npm install
+
+# Rodar em modo de desenvolvimento (hot reload)
+npm run dev
+
+# Build para produção
+npm run build
+
+# Lint
+npm run lint
 ```
 
-❌ Evitar
+## Configuração
 
-```text
-button.tsx
-chatmessage.tsx
-```
+O frontend roda na porta **5173** (padrão do Vite). O backend é esperado na porta **8000**.
 
----
-
-## Hooks
-
-Sempre iniciar com `use`.
-
-✅
-
-```text
-useChat.ts
-usePresence.ts
-useWebSocket.ts
-```
-
----
-
-## Types
-
-Utilizar nomes em minúsculo relacionados ao domínio.
-
-Exemplo:
-
-```text
-chat.ts
-user.ts
-message.ts
-```
-
----
-
-## Componentes maiores
-
-Quando um componente crescer, criar uma pasta própria.
-
-Exemplo:
-
-```text
-Button/
-├── Button.tsx
-├── Button.module.css
-└── index.ts
-```
-
----
-
-# Princípios do Projeto
-
-Este projeto segue algumas regras simples para manter a organização ao longo do tempo.
-
-* Cada arquivo deve possuir uma única responsabilidade.
-* Cada pasta deve possuir um único propósito.
-* Evite criar novas pastas antes que exista uma necessidade real.
-* Componentes reutilizáveis pertencem a `components/`.
-* Componentes específicos de uma funcionalidade pertencem a `features/<feature>/`.
-* Toda comunicação com APIs e WebSockets deve passar por `services/`.
-* Hooks específicos de uma feature podem permanecer dentro dela; hooks reutilizáveis devem ficar em `hooks/`.
-* Prefira composição de componentes em vez de componentes excessivamente grandes.
-* Organize o projeto para facilitar manutenção, leitura e evolução.
-
----
-
-# Filosofia
-
-A prioridade deste projeto é **clareza**.
-
-A estrutura deve crescer de forma gradual, acompanhando a evolução da aplicação. Evite antecipar complexidade ou criar camadas que ainda não possuem utilidade.
-
-Sempre que surgir uma nova funcionalidade, pergunte:
-
-* Ela pode reutilizar algo que já existe?
-* Ela pertence a uma feature específica?
-* Ela mantém a responsabilidade da pasta onde está sendo criada?
-
-Se a resposta for **sim**, provavelmente ela está no lugar certo.
+Para alterar, modificar `vite.config.ts` e o `docker-compose.yml`.
