@@ -114,17 +114,17 @@ Descrição: Cadastrar e consultar usuários via HTTP.
 
 Descrição: Garantir persistência e consultas corretamente.
 
-# Epic 3 — Product Service [*]
+# Epic 3 — Product Service [OK]
 
-## Card 7 — Implementar domínio de produtos [*]
+## Card 7 — Implementar domínio de produtos [OK]
 
 Descrição: Criar entidade, persistência e estoque inicial.
 
-## Card 8 — Criar API REST de produtos [*]
+## Card 8 — Criar API REST de produtos [OK]
 
 Descrição: Cadastrar e consultar produtos via HTTP.
 
-## Card 9 — Validar funcionamento do Product Service [*]
+## Card 9 — Validar funcionamento do Product Service [OK]
 
 Descrição: Garantir persistência e consultas corretamente.
 
