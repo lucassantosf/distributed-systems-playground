@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package user;
+
+option java_multiple_files = true;
+option java_package = "com.playground.user";
+
+import "common/types.proto";
+
+message User {
+    string id = 1;
+    string name = 2;
+    string email = 3;
+    string created_at = 4;
+    string updated_at = 5;
+}
+
+message GetUserRequest {
+    string id = 1;
+}
+
+message GetUserByEmailRequest {
+    string email = 1;
+}
+
+message ListUsersRequest {
+    common.Pagination pagination = 1;
+}
+
+message ListUsersResponse {
+    repeated User users = 1;
+    common.PaginationResponse pagination = 2;
+}
+
+message CreateUserRequest {
+    string name = 1;
+    string email = 2;
+}
+
+service UserService {
+    rpc GetUser (GetUserRequest) returns (User);
+    rpc GetUserByEmail (GetUserByEmailRequest) returns (User);
+    rpc ListUsers (ListUsersRequest) returns (ListUsersResponse);
+    rpc CreateUser (CreateUserRequest) returns (User);
+}

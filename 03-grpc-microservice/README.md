@@ -8,14 +8,24 @@ Este projeto explora a arquitetura de microsserviços utilizando FastAPI, gRPC e
 ```
 03-grpc-microservice/
 ├── README.md
+├── Makefile              (compile protos)
 ├── docker-compose.yml
 ├── .env                  (variáveis de ambiente para Docker)
 ├── .env.example
 ├── .gitignore
 │
 ├── shared/
-│   ├── protos/           (contratos gRPC — Card 10)
+│   ├── protos/           (contratos Protocol Buffers)
+│   │   ├── common/
+│   │   │   └── types.proto
+│   │   ├── user/
+│   │   │   └── user.proto
+│   │   ├── product/
+│   │   │   └── product.proto
+│   │   └── order/
+│   │       └── order.proto
 │   └── common/           (código compartilhado)
+│       └── generated/    (código Python gerado dos protos)
 │
 ├── user-service/
 │   ├── app/
@@ -85,6 +95,30 @@ docker compose exec user-service alembic downgrade -1
 | user-service   | http://localhost:8001/health |
 | product-service| http://localhost:8002/health |
 | order-service  | http://localhost:8003/health |
+
+## Protocol Buffers (gRPC)
+
+Os contratos gRPC ficam em `shared/protos/`. Para compilar e gerar o código Python:
+
+```bash
+# Instalar dependência (na máquina host)
+pip install grpcio-tools
+
+# Compilar todos os protos
+make proto
+
+# Ou diretamente
+python -m grpc_tools.protoc \
+    -I./shared/protos \
+    --python_out=./shared/common/generated \
+    --grpc_python_out=./shared/common/generated \
+    ./shared/protos/common/types.proto \
+    ./shared/protos/user/user.proto \
+    ./shared/protos/product/product.proto \
+    ./shared/protos/order/order.proto
+```
+
+Os arquivos gerados ficam em `shared/common/generated/`.
 
 # Epic 1 — Fundação [OK]
 
