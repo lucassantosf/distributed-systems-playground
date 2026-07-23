@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package product;
+
+option java_multiple_files = true;
+option java_package = "com.playground.product";
+
+import "common/types.proto";
+
+message Product {
+    string id = 1;
+    string name = 2;
+    string description = 3;
+    string price = 4;
+    int32 stock = 5;
+    string created_at = 6;
+    string updated_at = 7;
+}
+
+message GetProductRequest {
+    string id = 1;
+}
+
+message ListProductsRequest {
+    common.Pagination pagination = 1;
+}
+
+message ListProductsResponse {
+    repeated Product products = 1;
+    common.PaginationResponse pagination = 2;
+}
+
+message CreateProductRequest {
+    string name = 1;
+    string description = 2;
+    string price = 3;
+    int32 stock = 4;
+}
+
+service ProductService {
+    rpc GetProduct (GetProductRequest) returns (Product);
+    rpc ListProducts (ListProductsRequest) returns (ListProductsResponse);
+    rpc CreateProduct (CreateProductRequest) returns (Product);
+}

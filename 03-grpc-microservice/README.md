@@ -162,23 +162,23 @@ Descrição: Cadastrar e consultar produtos via HTTP.
 
 Descrição: Garantir persistência e consultas corretamente.
 
-# Epic 4 — Introdução ao gRPC [*]
+# Epic 4 — Introdução ao gRPC [OK]
 
-## Card 10 — Criar contratos Protocol Buffers [*]
+## Card 10 — Criar contratos Protocol Buffers [OK]
 
 Descrição: Definir mensagens e serviços compartilhados.
 
-## Card 11 — Implementar servidor gRPC do User Service [*]
+## Card 11 — Implementar servidor gRPC do User Service [OK]
 
 Descrição: Expor usuários através de contratos tipados.
 
-## Card 12 — Consumir User Service via gRPC [*]
+## Card 12 — Consumir User Service via gRPC [OK]
 
 Descrição: Criar cliente e validar comunicação remota.
 
 # Epic 5 — gRPC no Product Service [*]
 
-## Card 13 — Implementar servidor gRPC do Product Service [*]
+## Card 13 — Implementar servidor gRPC do Product Service [OK]
 
 Descrição: Expor informações de produtos via gRPC.
 

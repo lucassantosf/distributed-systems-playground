@@ -5,6 +5,7 @@ services:
     container_name: user-service
     ports:
       - "8001:8000"
+      - "50051:50051"
     env_file:
       - ./user-service/.env
     volumes:
@@ -38,6 +39,7 @@ services:
     container_name: product-service
     ports:
       - "8002:8000"
+      - "50052:50052"
     env_file:
       - ./product-service/.env
     volumes:
@@ -76,6 +78,8 @@ services:
     volumes:
       - ./order-service/app:/app
     depends_on:
+      user-service:
+        condition: service_started
       order-db:
         condition: service_healthy
     networks:

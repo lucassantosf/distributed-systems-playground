@@ -38,7 +38,7 @@ class UserServiceServicer(user_pb2_grpc.UserServiceServicer):
         db = SessionLocal()
         try:
             service = UserService(db)
-            skip = request.pagination.page * request.pagination.per_page if request.pagination.page else 0
+            skip = (request.pagination.page - 1) * request.pagination.per_page if request.pagination.page else 0
             limit = request.pagination.per_page if request.pagination.per_page else 100
             users, total = service.list_users(skip=skip, limit=limit)
 
