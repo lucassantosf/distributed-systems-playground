@@ -12,7 +12,10 @@ python -m grpc_tools.protoc \
     --grpc_python_out=./proto/generated \
     ./proto/common/types.proto \
     ./proto/product/product.proto
+
 touch proto/generated/__init__.py
+touch proto/generated/common/__init__.py
+touch proto/generated/product/__init__.py
 
 find proto/generated -name "*.py" -not -name "__init__.py" -exec sed -i \
     -e 's/from common import/from proto.generated.common import/g' \

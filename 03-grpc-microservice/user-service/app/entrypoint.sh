@@ -12,9 +12,11 @@ python -m grpc_tools.protoc \
     --grpc_python_out=./proto/generated \
     ./proto/common/types.proto \
     ./proto/user/user.proto
-touch proto/generated/__init__.py
 
-# Fix import paths in generated files
+touch proto/generated/__init__.py
+touch proto/generated/common/__init__.py
+touch proto/generated/user/__init__.py
+
 find proto/generated -name "*.py" -not -name "__init__.py" -exec sed -i \
     -e 's/from common import/from proto.generated.common import/g' \
     -e 's/from user import/from proto.generated.user import/g' \

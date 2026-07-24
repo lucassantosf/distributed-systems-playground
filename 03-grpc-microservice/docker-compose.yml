@@ -80,6 +80,8 @@ services:
     depends_on:
       user-service:
         condition: service_started
+      product-service:
+        condition: service_started
       order-db:
         condition: service_healthy
     networks:

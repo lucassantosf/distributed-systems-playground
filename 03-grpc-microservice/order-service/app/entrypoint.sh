@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+echo "Running migrations..."
+alembic upgrade head
+
 echo "Compiling proto files..."
 mkdir -p proto/generated
 python -m grpc_tools.protoc \

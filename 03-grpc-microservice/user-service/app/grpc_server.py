@@ -1,9 +1,7 @@
 import uuid
 from concurrent import futures
-from datetime import datetime, timezone
 
 import grpc
-from google.protobuf import empty_pb2
 
 from proto.generated.user import user_pb2, user_pb2_grpc
 from database import SessionLocal

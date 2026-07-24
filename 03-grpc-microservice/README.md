@@ -90,11 +90,11 @@ docker compose exec user-service alembic downgrade -1
 
 ## Portas
 
-| Serviço        | URL                          |
-|----------------|------------------------------|
-| user-service   | http://localhost:8001/health |
-| product-service| http://localhost:8002/health |
-| order-service  | http://localhost:8003/health |
+| Serviço        | REST (FastAPI)               | gRPC                          |
+|----------------|------------------------------|-------------------------------|
+| user-service   | http://localhost:8001/health | localhost:50051               |
+| product-service| http://localhost:8002/health | localhost:50052               |
+| order-service  | http://localhost:8003/health | — (cliente apenas)            |
 
 ## Protocol Buffers (gRPC)
 
@@ -176,45 +176,45 @@ Descrição: Expor usuários através de contratos tipados.
 
 Descrição: Criar cliente e validar comunicação remota.
 
-# Epic 5 — gRPC no Product Service [*]
+# Epic 5 — gRPC no Product Service [OK]
 
 ## Card 13 — Implementar servidor gRPC do Product Service [OK]
 
 Descrição: Expor informações de produtos via gRPC.
 
-## Card 14 — Consumir Product Service via gRPC [*]
+## Card 14 — Consumir Product Service via gRPC [OK]
 
 Descrição: Validar comunicação remota entre serviços.
 
-## Card 15 — Consolidar comunicação entre serviços [*]
+## Card 15 — Consolidar comunicação entre serviços [OK]
 
 Descrição: Garantir contratos consistentes e reutilizáveis.
 
-# Epic 6 — Order Service [*]
+# Epic 6 — Order Service [OK]
 
-## Card 16 — Implementar domínio de pedidos [*]
+## Card 16 — Implementar domínio de pedidos [OK]
 
 Descrição: Criar entidade, persistência e regras principais.
 
-## Card 17 — Criar API REST de pedidos [*]
+## Card 17 — Criar API REST de pedidos [OK]
 
 Descrição: Receber requisições para criação de pedidos.
 
-## Card 18 — Integrar Order com User Service [*]
+## Card 18 — Integrar Order com User Service [OK]
 
 Descrição: Validar existência do usuário usando gRPC.
 
-# Epic 7 — Integração Completa [*]
+# Epic 7 — Integração Completa [OK]
 
-## Card 19 — Integrar Order com Product Service [*]
+## Card 19 — Integrar Order com Product Service [OK]
 
 Descrição: Buscar produto antes de criar pedidos.
 
-## Card 20 — Validar regras de negócio distribuídas [*]
+## Card 20 — Validar regras de negócio distribuídas [OK]
 
 Descrição: Criar pedidos somente com dados válidos.
 
-## Card 21 — Calcular valores utilizando Product Service [*]
+## Card 21 — Calcular valores utilizando Product Service [OK]
 
 Descrição: Nunca confiar em preços enviados pelo cliente.
 
