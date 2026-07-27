@@ -1,6 +1,9 @@
 import grpc
 from proto.generated.user import user_pb2, user_pb2_grpc
 from proto.generated.common import types_pb2
+from exceptions import ServiceUnavailableError, ServiceTimeoutError, UserNotFoundError
+
+GRPC_TIMEOUT = 5
 
 
 class UserServiceClient:
@@ -10,21 +13,43 @@ class UserServiceClient:
 
     def get_user(self, user_id: str):
         request = user_pb2.GetUserRequest(id=user_id)
-        return self.stub.GetUser(request)
+        try:
+            return self.stub.GetUser(request, timeout=GRPC_TIMEOUT)
+        except grpc.RpcError as e:
+            self._handle_error(e, user_id)
 
     def get_user_by_email(self, email: str):
         request = user_pb2.GetUserByEmailRequest(email=email)
-        return self.stub.GetUserByEmail(request)
+        try:
+            return self.stub.GetUserByEmail(request, timeout=GRPC_TIMEOUT)
+        except grpc.RpcError as e:
+            self._handle_error(e, email)
 
     def list_users(self, page: int = 1, per_page: int = 100):
         request = user_pb2.ListUsersRequest(
             pagination=types_pb2.Pagination(page=page, per_page=per_page)
         )
-        return self.stub.ListUsers(request)
+        try:
+            return self.stub.ListUsers(request, timeout=GRPC_TIMEOUT)
+        except grpc.RpcError as e:
+            self._handle_error(e)
 
     def create_user(self, name: str, email: str):
         request = user_pb2.CreateUserRequest(name=name, email=email)
-        return self.stub.CreateUser(request)
+        try:
+            return self.stub.CreateUser(request, timeout=GRPC_TIMEOUT)
+        except grpc.RpcError as e:
+            self._handle_error(e)
 
     def close(self):
         self.channel.close()
+
+    def _handle_error(self, e: grpc.RpcError, resource_id: str = None):
+        code = e.code()
+        if code == grpc.StatusCode.DEADLINE_EXCEEDED:
+            raise ServiceTimeoutError("user-service")
+        if code == grpc.StatusCode.UNAVAILABLE:
+            raise ServiceUnavailableError("user-service")
+        if code == grpc.StatusCode.NOT_FOUND:
+            raise UserNotFoundError(resource_id or "unknown")
+        raise ServiceUnavailableError("user-service")

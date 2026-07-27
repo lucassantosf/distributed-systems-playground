@@ -6,6 +6,7 @@ from repositories.order import OrderRepository
 from schemas.order import OrderCreate
 from grpc_clients.user import UserServiceClient
 from grpc_clients.product import ProductServiceClient
+from exceptions import MicroserviceError, UserNotFoundError, ProductNotFoundError
 
 
 class OrderService:
@@ -18,10 +19,12 @@ class OrderService:
 
         try:
             user = user_client.get_user(str(data.user_id))
-            if not user:
-                raise ValueError("User not found")
+        except UserNotFoundError:
+            raise
+        except MicroserviceError:
+            raise
         except Exception:
-            raise ValueError("User not found or unavailable")
+            raise MicroserviceError("user-service", "Failed to validate user")
         finally:
             user_client.close()
 
@@ -31,11 +34,12 @@ class OrderService:
         for item in data.items:
             try:
                 product = product_client.get_product(str(item.product_id))
-                if not product:
-                    raise ValueError(f"Product {item.product_id} not found")
 
                 if product.stock < item.quantity:
-                    raise ValueError(f"Insufficient stock for product {product.name}")
+                    from exceptions import InsufficientStockError
+                    raise InsufficientStockError(
+                        str(item.product_id), product.stock, item.quantity
+                    )
 
                 unit_price = float(product.price)
                 total_price += unit_price * item.quantity
@@ -45,10 +49,10 @@ class OrderService:
                     "quantity": item.quantity,
                     "unit_price": unit_price
                 })
-            except ValueError:
+            except (ProductNotFoundError, MicroserviceError):
                 raise
             except Exception:
-                raise ValueError(f"Product {item.product_id} unavailable")
+                raise MicroserviceError("product-service", f"Product {item.product_id} unavailable")
             finally:
                 pass
 

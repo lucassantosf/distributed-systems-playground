@@ -218,17 +218,17 @@ Descrição: Criar pedidos somente com dados válidos.
 
 Descrição: Nunca confiar em preços enviados pelo cliente.
 
-# Epic 8 — Tratamento de Falhas [*]
+# Epic 8 — Tratamento de Falhas [OK]
 
-## Card 22 — Tratar erros entre microsserviços [*]
+## Card 22 — Tratar erros entre microsserviços [OK]
 
 Descrição: Usuário inexistente, produto inválido e timeouts.
 
-## Card 23 — Padronizar respostas de erro [*]
+## Card 23 — Padronizar respostas de erro [OK]
 
 Descrição: Retornar erros consistentes entre serviços.
 
-## Card 24 — Implementar timeout nas chamadas gRPC [*]
+## Card 24 — Implementar timeout nas chamadas gRPC [OK]
 
 Descrição: Evitar bloqueios em falhas de comunicação.
 
