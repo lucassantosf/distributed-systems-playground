@@ -1,4 +1,5 @@
 import uuid
+import logging
 from concurrent import futures
 
 import grpc
@@ -7,6 +8,9 @@ from proto.generated.user import user_pb2, user_pb2_grpc
 from database import SessionLocal
 from services.user import UserService
 from schemas.user import UserCreate
+from interceptors.logging import LoggingServerInterceptor, setup_logging
+
+setup_logging("user-service")
 
 
 class UserServiceServicer(user_pb2_grpc.UserServiceServicer):
@@ -76,7 +80,11 @@ class UserServiceServicer(user_pb2_grpc.UserServiceServicer):
 
 
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    interceptor = LoggingServerInterceptor("user-service")
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=10),
+        interceptors=[interceptor],
+    )
     user_pb2_grpc.add_UserServiceServicer_to_server(UserServiceServicer(), server)
     server.add_insecure_port("[::]:50051")
     server.start()

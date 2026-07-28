@@ -15,6 +15,7 @@ from services.product import ProductService
 router = APIRouter(prefix="/products", tags=["products"])
 
 
+@router.post("", response_model=ProductResponse, status_code=201)
 @router.post("/", response_model=ProductResponse, status_code=201)
 def create_product(data: ProductCreate, db: Session = Depends(get_db)):
     service = ProductService(db)
@@ -24,6 +25,7 @@ def create_product(data: ProductCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("", response_model=ProductList)
 @router.get("/", response_model=ProductList)
 def list_products(
     skip: int = Query(0, ge=0),

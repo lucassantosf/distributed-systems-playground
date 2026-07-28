@@ -10,6 +10,7 @@ services:
       - ./user-service/.env
     volumes:
       - ./user-service/app:/app
+      - ./logs:/logs
     depends_on:
       user-db:
         condition: service_healthy
@@ -44,6 +45,7 @@ services:
       - ./product-service/.env
     volumes:
       - ./product-service/app:/app
+      - ./logs:/logs
     depends_on:
       product-db:
         condition: service_healthy
@@ -77,6 +79,7 @@ services:
       - ./order-service/.env
     volumes:
       - ./order-service/app:/app
+      - ./logs:/logs
     depends_on:
       user-service:
         condition: service_started

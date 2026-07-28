@@ -1,4 +1,5 @@
 import uuid
+import logging
 from concurrent import futures
 
 import grpc
@@ -7,6 +8,9 @@ from proto.generated.product import product_pb2, product_pb2_grpc
 from database import SessionLocal
 from services.product import ProductService
 from schemas.product import ProductCreate
+from interceptors.logging import LoggingServerInterceptor, setup_logging
+
+setup_logging("product-service")
 
 
 class ProductServiceServicer(product_pb2_grpc.ProductServiceServicer):
@@ -72,7 +76,11 @@ class ProductServiceServicer(product_pb2_grpc.ProductServiceServicer):
 
 
 def serve():
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    interceptor = LoggingServerInterceptor("product-service")
+    server = grpc.server(
+        futures.ThreadPoolExecutor(max_workers=10),
+        interceptors=[interceptor],
+    )
     product_pb2_grpc.add_ProductServiceServicer_to_server(ProductServiceServicer(), server)
     server.add_insecure_port("[::]:50052")
     server.start()

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+umask 000
+mkdir -p /logs
+
 echo "Running migrations..."
 alembic upgrade head
 

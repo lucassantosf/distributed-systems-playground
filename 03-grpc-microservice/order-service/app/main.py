@@ -1,5 +1,9 @@
-import grpc
+import time
+import logging
+import uuid as uuid_lib
+
 from fastapi import FastAPI, Depends, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from proto.generated.user import user_pb2
 from proto.generated.product import product_pb2
 from proto.generated.common import types_pb2
@@ -14,8 +18,40 @@ from schemas.order import OrderCreate, OrderList, OrderResponse
 from grpc_clients.user import UserServiceClient
 from grpc_clients.product import ProductServiceClient
 from exceptions import MicroserviceError, InsufficientStockError
+from interceptors.logging import setup_logging, set_request_id
+
+setup_logging("order-service")
+
+logger = logging.getLogger("http.order-service")
 
 app = FastAPI(title="Order Service")
+
+
+class HTTPLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("x-request-id", str(uuid_lib.uuid4())[:8])
+        set_request_id(request_id)
+        start = time.time()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            elapsed = round((time.time() - start) * 1000)
+            logger.info(
+                "%s %s | %dms | %d",
+                request.method, request.url.path, elapsed, status_code,
+                extra={
+                    "request_id": request_id,
+                    "method": f"HTTP {request.method} {request.url.path}",
+                    "latency_ms": elapsed,
+                    "status": str(status_code),
+                },
+            )
+
+
+app.add_middleware(HTTPLoggingMiddleware)
 
 
 @app.exception_handler(RequestValidationError)
@@ -134,12 +170,14 @@ def health_check():
     return {"status": status, "service": "order-service", "checks": checks}
 
 
+@app.post("/orders", response_model=OrderResponse, status_code=201)
 @app.post("/orders/", response_model=OrderResponse, status_code=201)
 def create_order(data: OrderCreate, db: Session = Depends(get_db)):
     service = OrderService(db)
     return service.create_order(data)
 
 
+@app.get("/orders", response_model=OrderList)
 @app.get("/orders/", response_model=OrderList)
 def list_orders(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     service = OrderService(db)

@@ -10,6 +10,7 @@ from services.user import UserService
 router = APIRouter(prefix="/users", tags=["users"])
 
 
+@router.post("", response_model=UserResponse, status_code=201)
 @router.post("/", response_model=UserResponse, status_code=201)
 def create_user(data: UserCreate, db: Session = Depends(get_db)):
     service = UserService(db)
@@ -19,6 +20,7 @@ def create_user(data: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("", response_model=UserList)
 @router.get("/", response_model=UserList)
 def list_users(
     skip: int = Query(0, ge=0),

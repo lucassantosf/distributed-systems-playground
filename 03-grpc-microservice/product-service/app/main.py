@@ -1,4 +1,9 @@
+import time
+import logging
+import uuid as uuid_lib
+
 from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
@@ -6,9 +11,40 @@ from sqlalchemy import text
 
 from database import engine
 from routers.product import router as product_router
+from interceptors.logging import setup_logging, set_request_id
+
+setup_logging("product-service")
+
+logger = logging.getLogger("http.product-service")
 
 app = FastAPI(title="Product Service")
 
+
+class HTTPLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("x-request-id", str(uuid_lib.uuid4())[:8])
+        set_request_id(request_id)
+        start = time.time()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            elapsed = round((time.time() - start) * 1000)
+            logger.info(
+                "%s %s | %dms | %d",
+                request.method, request.url.path, elapsed, status_code,
+                extra={
+                    "request_id": request_id,
+                    "method": f"HTTP {request.method} {request.url.path}",
+                    "latency_ms": elapsed,
+                    "status": str(status_code),
+                },
+            )
+
+
+app.add_middleware(HTTPLoggingMiddleware)
 app.include_router(product_router)
 
 

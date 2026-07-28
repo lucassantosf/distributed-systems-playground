@@ -232,17 +232,17 @@ Descrição: Retornar erros consistentes entre serviços.
 
 Descrição: Evitar bloqueios em falhas de comunicação.
 
-# Epic 9 — Robustez [*]
+# Epic 9 — Robustez [OK]
 
-## Card 25 — Adicionar interceptors gRPC [*]
+## Card 25 — Adicionar interceptors gRPC [OK]
 
 Descrição: Registrar logs automaticamente em cada chamada.
 
-## Card 26 — Implementar metadata das requisições [*]
+## Card 26 — Implementar metadata das requisições [OK]
 
 Descrição: Compartilhar informações entre serviços.
 
-## Card 27 — Criar logs estruturados [*]
+## Card 27 — Criar logs estruturados [OK]
 
 Descrição: Facilitar rastreamento e depuração distribuída.
 
