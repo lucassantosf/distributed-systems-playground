@@ -1,7 +1,7 @@
 PROTO_DIR := ./shared/protos
 OUTPUT_DIR := ./shared/common
 
-.PHONY: proto help logs logs-user logs-product logs-order logs-pretty up down restart
+.PHONY: proto help logs logs-user logs-product logs-order logs-pretty up down restart validate-isolation e2e
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -66,3 +66,45 @@ down: ## Stop services
 restart: ## Restart services
 	@mkdir -p ./logs && chmod 777 ./logs
 	docker compose restart
+
+e2e: ## Run end-to-end test (full order flow across all services)
+	@scripts/e2e.sh
+
+validate-isolation: ## Validate each service can only access its own database
+	@echo "=== Validating Service Database Isolation ==="
+	@echo "Each service must reach only its own database."
+	@echo ""
+	@echo "--- user-service ---"
+	@printf '%s\n' \
+		'import psycopg2' \
+		'for host,db,ok in [("user-db","user_db",1),("product-db","product_db",0),("order-db","order_db",0)]:' \
+		'  try:' \
+		'    c=psycopg2.connect(host=host,port=5432,dbname=db,user="postgres",password="postgres",connect_timeout=3); c.close()' \
+		'    print(f"  {host:15s} {db:15s} " + ("OK" if ok else "UNSAFE"))' \
+		'  except Exception:' \
+		'    print(f"  {host:15s} {db:15s} " + ("ISOLATED" if not ok else "FAIL"))' \
+		| docker compose exec -T user-service python
+	@echo ""
+	@echo "--- product-service ---"
+	@printf '%s\n' \
+		'import psycopg2' \
+		'for host,db,ok in [("product-db","product_db",1),("user-db","user_db",0),("order-db","order_db",0)]:' \
+		'  try:' \
+		'    c=psycopg2.connect(host=host,port=5432,dbname=db,user="postgres",password="postgres",connect_timeout=3); c.close()' \
+		'    print(f"  {host:15s} {db:15s} " + ("OK" if ok else "UNSAFE"))' \
+		'  except Exception:' \
+		'    print(f"  {host:15s} {db:15s} " + ("ISOLATED" if not ok else "FAIL"))' \
+		| docker compose exec -T product-service python
+	@echo ""
+	@echo "--- order-service ---"
+	@printf '%s\n' \
+		'import psycopg2' \
+		'for host,db,ok in [("order-db","order_db",1),("user-db","user_db",0),("product-db","product_db",0)]:' \
+		'  try:' \
+		'    c=psycopg2.connect(host=host,port=5432,dbname=db,user="postgres",password="postgres",connect_timeout=3); c.close()' \
+		'    print(f"  {host:15s} {db:15s} " + ("OK" if ok else "UNSAFE"))' \
+		'  except Exception:' \
+		'    print(f"  {host:15s} {db:15s} " + ("ISOLATED" if not ok else "FAIL"))' \
+		| docker compose exec -T order-service python
+	@echo ""
+	@echo "=== Validation complete ==="

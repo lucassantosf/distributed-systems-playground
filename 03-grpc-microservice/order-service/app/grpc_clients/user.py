@@ -2,7 +2,7 @@ import grpc
 from proto.generated.user import user_pb2, user_pb2_grpc
 from proto.generated.common import types_pb2
 from exceptions import ServiceUnavailableError, ServiceTimeoutError, UserNotFoundError
-from interceptors.logging import LoggingClientInterceptor
+from interceptors.logging import LoggingClientInterceptor, RetryClientInterceptor
 
 GRPC_TIMEOUT = 5
 
@@ -10,8 +10,9 @@ GRPC_TIMEOUT = 5
 class UserServiceClient:
     def __init__(self, host: str = "user-service", port: int = 50051):
         channel = grpc.insecure_channel(f"{host}:{port}")
-        interceptor = LoggingClientInterceptor("order->user", metadata_name="order-service")
-        self.channel = grpc.intercept_channel(channel, interceptor)
+        retry = RetryClientInterceptor("order->user")
+        logging = LoggingClientInterceptor("order->user", metadata_name="order-service")
+        self.channel = grpc.intercept_channel(channel, retry, logging)
         self.stub = user_pb2_grpc.UserServiceStub(self.channel)
 
     def get_user(self, user_id: str):

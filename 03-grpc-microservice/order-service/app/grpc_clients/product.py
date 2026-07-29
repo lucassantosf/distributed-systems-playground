@@ -2,7 +2,7 @@ import grpc
 from proto.generated.product import product_pb2, product_pb2_grpc
 from proto.generated.common import types_pb2
 from exceptions import ServiceUnavailableError, ServiceTimeoutError, ProductNotFoundError
-from interceptors.logging import LoggingClientInterceptor
+from interceptors.logging import LoggingClientInterceptor, RetryClientInterceptor
 
 GRPC_TIMEOUT = 5
 
@@ -10,8 +10,9 @@ GRPC_TIMEOUT = 5
 class ProductServiceClient:
     def __init__(self, host: str = "product-service", port: int = 50052):
         channel = grpc.insecure_channel(f"{host}:{port}")
-        interceptor = LoggingClientInterceptor("order->product", metadata_name="order-service")
-        self.channel = grpc.intercept_channel(channel, interceptor)
+        retry = RetryClientInterceptor("order->product")
+        logging = LoggingClientInterceptor("order->product", metadata_name="order-service")
+        self.channel = grpc.intercept_channel(channel, retry, logging)
         self.stub = product_pb2_grpc.ProductServiceStub(self.channel)
 
     def get_product(self, product_id: str):

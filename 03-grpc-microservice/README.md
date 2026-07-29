@@ -8,11 +8,16 @@ Este projeto explora a arquitetura de microsserviços utilizando FastAPI, gRPC e
 ```
 03-grpc-microservice/
 ├── README.md
-├── Makefile              (compile protos)
+├── Makefile              (targets: up, down, logs, e2e, validate-isolation, proto)
 ├── docker-compose.yml
 ├── .env                  (variáveis de ambiente para Docker)
 ├── .env.example
 ├── .gitignore
+│
+├── scripts/
+│   └── e2e.sh            (teste E2E — make e2e)
+│
+├── logs/                 (bind mount — logs JSON de todos os serviços)
 │
 ├── shared/
 │   ├── protos/           (contratos Protocol Buffers)
@@ -24,7 +29,8 @@ Este projeto explora a arquitetura de microsserviços utilizando FastAPI, gRPC e
 │   │   │   └── product.proto
 │   │   └── order/
 │   │       └── order.proto
-│   └── common/           (código compartilhado)
+│   ├── interceptors/     (retry, logging, metadata — shared entre serviços)
+│   └── common/
 │       └── generated/    (código Python gerado dos protos)
 │
 ├── user-service/
@@ -119,6 +125,120 @@ python -m grpc_tools.protoc \
 ```
 
 Os arquivos gerados ficam em `shared/common/generated/`.
+
+## Makefile
+
+| Target                 | Descrição |
+|------------------------|-----------|
+| `make up`              | Sobe todos os containers (cria `./logs` com permissão 777) |
+| `make down`            | Para todos os containers |
+| `make restart`         | Reinicia os containers |
+| `make logs`            | Mostra logs dos 3 serviços |
+| `make logs-user`       | Logs do user-service |
+| `make logs-product`    | Logs do product-service |
+| `make logs-order`      | Logs do order-service |
+| `make logs-pretty`     | Logs formatados (JSON pretty-print) |
+| `make logs-clear`      | Limpa todos os logs |
+| `make proto`           | Compila os arquivos .proto |
+| `make clean`           | Remove arquivos gerados |
+| `make validate-isolation` | Verifica isolamento de rede entre serviços e bancos |
+| `make e2e`             | Executa 25 testes de fluxo completo |
+
+## Logs Estruturados
+
+Todos os serviços emitem logs em **JSON** com os seguintes campos:
+
+```json
+{
+  "timestamp": "2026-07-28T20:36:12Z",
+  "service": "order-service",
+  "level": "INFO",
+  "logger": "uvicorn.access",
+  "message": "POST /orders/ 201",
+  "request_id": "a1b2c3d4-...",
+  "method": "POST",
+  "path": "/orders/",
+  "status_code": 201
+}
+```
+
+**Características:**
+
+- **`ResilientFileHandler`** — recria automaticamente arquivos de log deletados externamente
+- **`JsonFormatter`** — logs em JSON para processamento automatizado
+- **`ServiceContextFilter`** — injeta service name, request-id em cada registro
+- **`request_id` via `contextvars`** — propagado através de `set_request_id()`/`get_request_id()`
+- **Propagação HTTP → gRPC** — request-id via metadata gRPC (ASCII only)
+- **Bind mount `./logs:/logs`** — todos os logs centralizados no host
+- **Rotas com/sem trailing slash** — `/orders` e `/orders/` para evitar redirect 307
+
+## gRPC Features
+
+### Interceptors
+
+| Interceptor | Tipo | Descrição |
+|---|---|---|
+| `LoggingServerInterceptor` | Server | Loga chamadas gRPC recebidas (método, peer, status) |
+| `LoggingClientInterceptor` | Client | Loga chamadas gRPC enviadas (target, método, latência) |
+| `RetryClientInterceptor` | Client | Retry com exponential backoff em falhas temporárias |
+
+### Retry
+
+O `RetryClientInterceptor` tenta novamente em códigos `UNAVAILABLE` e `DEADLINE_EXCEEDED`:
+
+```
+Tentativa 1 → falha → espera 0.5s
+Tentativa 2 → falha → espera 1.2s
+Tentativa 3 → falha → espera 2.8s → erro final
+```
+
+### Timeout
+
+Todas as chamadas gRPC usam `GRPC_TIMEOUT=5` segundos configurado via variável de ambiente.
+
+### Metadata
+
+O `request_id` é propagado automaticamente:
+- Requisição HTTP chega → `set_request_id()` gera/captura o ID
+- Chamada gRPC parte → `LoggingClientInterceptor` injeta o request-id no metadata
+- Servidor gRPC recebe → `LoggingServerInterceptor` extrai e aplica via `set_request_id()`
+
+## Tratamento de Erros
+
+### Erros padronizados
+
+| Tipo | HTTP | Descrição |
+|---|---|---|
+| `MicroserviceError` | 400-503 | Erro genérico de microsserviço (contém `service` e `type`) |
+| `UserNotFoundError` | 404 | Usuário não encontrado |
+| `ProductNotFoundError` | 404 | Produto não encontrado |
+| `InsufficientStockError` | 409 | Estoque insuficiente |
+| `ServiceUnavailableError` | 503 | Serviço remoto indisponível (após retry) |
+| `ServiceTimeoutError` | 504 | Timeout na chamada gRPC |
+
+### Formato de resposta de erro
+
+```json
+{
+  "error": "user-service",
+  "message": "User test@example.com not found",
+  "type": "microservice_error"
+}
+```
+
+## Isolamento de Rede
+
+Cada serviço e seu banco estão em redes Docker separadas. A comunicação entre serviços ocorre exclusivamente via gRPC em uma rede compartilhada.
+
+```
+user-db ── user-net ── user-service ──┐
+                                       ├── grpc-net
+product-db ── product-net ── product-service ──┘
+                                       │
+order-db ── order-net ── order-service ┘
+```
+
+Validado por: `make validate-isolation`
 
 # Epic 1 — Fundação [OK]
 
@@ -246,16 +366,16 @@ Descrição: Compartilhar informações entre serviços.
 
 Descrição: Facilitar rastreamento e depuração distribuída.
 
-# Epic 10 — Finalização [*]
+# Epic 10 — Finalização [OK]
 
-## Card 28 — Implementar retry nas chamadas gRPC [*]
+## Card 28 — Implementar retry nas chamadas gRPC [OK]
 
 Descrição: Recuperar falhas temporárias automaticamente.
 
-## Card 29 — Validar isolamento entre serviços [*]
+## Card 29 — Validar isolamento entre serviços [OK]
 
 Descrição: Nenhum serviço acessa banco de outro.
 
-## Card 30 — Executar fluxo completo de pedidos [*]
+## Card 30 — Executar fluxo completo de pedidos [OK]
 
-Descrição: Validar comunicação ponta a ponta entre microsserviços.
+Descrição: Validar comunicação ponta a ponta entre microsserviços. 25 testes E2E (Makefile: `make e2e`).

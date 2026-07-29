@@ -15,7 +15,8 @@ services:
       user-db:
         condition: service_healthy
     networks:
-      - microservices-net
+      - user-net
+      - grpc-net
 
   user-db:
     image: postgres:16-alpine
@@ -32,7 +33,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - microservices-net
+      - user-net
 
   # ==================== Product Service ====================
   product-service:
@@ -50,7 +51,8 @@ services:
       product-db:
         condition: service_healthy
     networks:
-      - microservices-net
+      - product-net
+      - grpc-net
 
   product-db:
     image: postgres:16-alpine
@@ -67,7 +69,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - microservices-net
+      - product-net
 
   # ==================== Order Service ====================
   order-service:
@@ -88,7 +90,8 @@ services:
       order-db:
         condition: service_healthy
     networks:
-      - microservices-net
+      - order-net
+      - grpc-net
 
   order-db:
     image: postgres:16-alpine
@@ -105,10 +108,16 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - microservices-net
+      - order-net
 
 networks:
-  microservices-net:
+  grpc-net:
+    driver: bridge
+  user-net:
+    driver: bridge
+  product-net:
+    driver: bridge
+  order-net:
     driver: bridge
 
 volumes:

@@ -2,6 +2,7 @@ import os
 import json
 import time
 import uuid
+import random
 import logging
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -215,3 +216,55 @@ class _ClientCallDetails(grpc.ClientCallDetails):
         self.credentials = credentials
         self.metadata = metadata
         self.compression = compression
+
+
+RETRYABLE_CODES = {grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED}
+
+
+class RetryClientInterceptor(grpc.UnaryUnaryClientInterceptor):
+    def __init__(self, service_name: str, max_retries: int = 3, base_delay: float = 0.5):
+        self.service_name = service_name
+        self.max_retries = max_retries
+        self.base_delay = base_delay
+        self.logger = logging.getLogger(f"retry.{service_name}")
+
+    def intercept_unary_unary(self, continuation, client_call_details, request):
+        last_error = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                call_future = continuation(client_call_details, request)
+                response = call_future.result()
+                return call_future
+            except grpc.RpcError as e:
+                last_error = e
+                if e.code() not in RETRYABLE_CODES or attempt == self.max_retries:
+                    raise
+                delay = self._backoff(attempt)
+                request_id = get_request_id() or "-"
+                self.logger.info(
+                    "Retry %d/%d for %s after %.1fs | %s",
+                    attempt + 1, self.max_retries,
+                    client_call_details.method.lstrip("/"),
+                    delay, e.code().name,
+                    extra={
+                        "request_id": request_id,
+                        "method": client_call_details.method.lstrip("/"),
+                        "status": e.code().name,
+                        "retry": attempt + 1,
+                        "max_retries": self.max_retries,
+                        "delay_ms": round(delay * 1000),
+                        "error": str(e.details()),
+                    },
+                )
+                time.sleep(delay)
+            except Exception as e:
+                last_error = e
+                if attempt == self.max_retries:
+                    raise
+                time.sleep(self._backoff(attempt))
+        raise last_error
+
+    def _backoff(self, attempt: int) -> float:
+        delay = min(self.base_delay * (2 ** attempt), 5.0)
+        jitter = random.uniform(0, 0.5 * delay)
+        return delay + jitter
