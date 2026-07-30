@@ -1,0 +1,163 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: 01-event-driven-orders
+meta:
+  id: wrk_9fbafe1735e5432cb7a241ae48b6b6a9
+  created: 1782761837015
+  modified: 1782761837015
+  description: ""
+collection:
+  - url: "{{ _.base_url }}health"
+    name: Heath
+    meta:
+      id: req_0574c6f7b4fc46da89b6661a819fe623
+      created: 1746369739468
+      modified: 1782159988880
+      isPrivate: false
+      description: ""
+      sortKey: -1746369739468
+    method: GET
+    headers:
+      - name: User-Agent
+        value: insomnia/11.0.2
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - name: Order
+    meta:
+      id: fld_1c7bfa48c1e6443dae772535da5d7b3e
+      created: 1782161615271
+      modified: 1782161615271
+      sortKey: -1782161615271
+      description: ""
+    children:
+      - url: "{{ _.base_url }}orders"
+        name: Store
+        meta:
+          id: req_e9e84a56271841ccae3272b47d7a6e26
+          created: 1782161629641
+          modified: 1782161763467
+          isPrivate: false
+          description: ""
+          sortKey: -1782161632313
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+            	"customer_name":"Lucas",
+            	"total_amount":"10.00"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}orders/1"
+        name: Show
+        meta:
+          id: req_5a55b3e1fd5540d1a19c635d26e96ac7
+          created: 1782161873634
+          modified: 1782161890918
+          isPrivate: false
+          description: ""
+          sortKey: -1777798815777
+        method: GET
+        headers:
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_b5ee78823eb44e15b6ac8ae97b62b3e5
+    created: 1746369733802
+    modified: 1772748716638
+  cookies:
+    - id: 10afb9ff-2a69-4654-b7ac-379ee600949b
+      key: KEYCLOAK_LOCALE
+      value: ""
+      domain: localhost
+      path: /realms/YETZ/
+      secure: false
+      httpOnly: true
+      extensions:
+        - Version=1
+        - Comment=Expiring cookie
+      hostOnly: true
+    - id: c0e6576f-887c-432f-b43a-0a3c396d52c7
+      key: KC_RESTART
+      value: ""
+      domain: localhost
+      path: /realms/YETZ/
+      secure: false
+      httpOnly: true
+      extensions:
+        - Version=1
+      hostOnly: true
+    - id: af6a60c8-9cf1-43a3-99cc-9bf83598d70b
+      key: KC_AUTH_STATE
+      value: ""
+      domain: localhost
+      path: /realms/YETZ/
+      secure: false
+      httpOnly: false
+      extensions:
+        - Version=1
+      hostOnly: true
+    - id: 86400df8-d8a6-40a7-ae60-665ad80d6bf4
+      key: XSRF-TOKEN
+      value: eyJpdiI6IjNnblQ2Y3FZc09HbitvS0RyT0xEd1E9PSIsInZhbHVlIjoiM2dtcnRRa0dIT2VreXI3a2hYNGRMUDRWZkNHTmVialQwdTBFZTA2RWVqZjdlOVVVSG8xdGdNQ3YrSjJ2NmUydFF4ajhITVM2b0VKYW5QbXJ0SWF1Q05uQm4wQ0hjN2owa0RUOUZ2TGlYZWNwODlmMkxpYWx4a01YNUx4WThFMFAiLCJtYWMiOiI2ZGZkNmIzOTY0NzZiZGUyZmM3NDlmMTk1ODBhMDJmNjlhODQ4ZDhkNTNiNTIwYjFhNTk5ZmZkYmY2YmFmOTQ2IiwidGFnIjoiIn0%3D
+      domain: localhost
+      path: /
+      secure: false
+      httpOnly: false
+      hostOnly: true
+    - id: 8511314d-6cdb-42ab-a4f4-53f5bb3b6d7d
+      key: laravel-session
+      value: eyJpdiI6IkNVWnVmTWtBYjgxanIveUpsZVNJd2c9PSIsInZhbHVlIjoiVk02NURydjdETC9hc1VvclQ0YS80V2h2TlZHTnhITi9NM0FYTGdlMGdHd2k3N0JLR0NIZVcvd2Z1SUpya3NSS0N1Wm5yOUdmdnliTlVFaHdLcUZ1NTFoaEk1WmU5YzN6L2dtbHZ1aWk0eEN2eEpuUjk3eUl6VlJXdmV2LzNCSEoiLCJtYWMiOiIwMWU5NjMwZmFhZGU3MTcwMjk2ODY0ODI3NzJkNmJjNTgxZmYyMjRjMjJmMGFkNWIxODdmNGYzMDg0NzZjZWExIiwidGFnIjoiIn0%3D
+      domain: localhost
+      path: /
+      secure: false
+      httpOnly: true
+      hostOnly: true
+environments:
+  name: Base Environment
+  meta:
+    id: env_571789968e3342fb90ed5612cc8e3ec6
+    created: 1746369733798
+    modified: 1746369733798
+    isPrivate: false
+  subEnvironments:
+    - name: Localhost
+      meta:
+        id: env_7428403be9c5481682390931048a3c9b
+        created: 1746369790909
+        modified: 1781817244589
+        isPrivate: false
+        sortKey: 1746369790909
+      data:
+        base_url: http://localhost:8000/
+        token: "{% response 'body', 'req_fb34ee1c6fa94831ac6521dbfa5bf82f',
+          'b64::JC5hY2Nlc3NfdG9rZW4=::46b', 'never', 60 %}"
+      color: "#5eda0b"

@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cqrs_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: command_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d command_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cqrs-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: cqrs_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cqrs-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: cqrs_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - cqrs-net
+
+  command-api:
+    build: ./command-api
+    container_name: cqrs_command_api
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./command-api/app:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - cqrs-net
+
+  query-api:
+    build: ./query-api
+    container_name: cqrs_query_api
+    ports:
+      - "8002:8000"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./query-api/app:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - cqrs-net
+
+  projection-worker:
+    build: ./projection-worker
+    container_name: cqrs_worker
+    env_file:
+      - .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./projection-worker/app:/app
+    networks:
+      - cqrs-net
+
+networks:
+  cqrs-net:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -5,6 +5,28 @@
 
 O **CQRS E-commerce** é um projeto focado na aplicação do padrão **Command Query Responsibility Segregation (CQRS)** em um cenário de e-commerce. O objetivo é separar completamente as operações de escrita (**Command Side**) das operações de leitura (**Query Side**), utilizando eventos para manter ambos os modelos sincronizados. Durante o desenvolvimento serão explorados conceitos como consistência eventual, mensageria, projeções, modelos de leitura otimizados e comunicação assíncrona entre componentes.
 
+## Diagrama de Fluxo
+
+                 Client
+
+          POST           GET
+           │               │
+           ▼               ▼
+     Command API       Query API
+           │
+           ▼
+     PostgreSQL
+           │
+     ProductCreated
+           │
+       RabbitMQ
+           │
+   Projection Worker
+           │
+          Redis
+           │
+       Query API
+
 ---
 
 ## Stack
@@ -53,18 +75,100 @@ Broker responsável por transportar os eventos gerados pelo Command Side até o 
 
 Banco em memória utilizado como modelo de leitura (Read Model), armazenando projeções otimizadas para consultas rápidas e independentes do banco transacional.
 
+## Estrutura do Projeto
 
-# [*] Epic 1 — Fundação
+```
+04-ecommerce-cqrs/
+├── command-api/                # API de escrita (FastAPI)
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── app/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── database.py
+│       ├── main.py
+│       └── models/
+│           └── __init__.py
+├── query-api/                  # API de leitura (FastAPI)
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── app/
+│       ├── __init__.py
+│       ├── config.py
+│       └── main.py
+├── projection-worker/          # Consumidor de eventos
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── app/
+│       ├── __init__.py
+│       └── main.py
+├── shared/
+│   ├── __init__.py
+│   ├── events/                 # Definição dos eventos
+│   │   └── __init__.py
+│   ├── schemas/                # Schemas compartilhados
+│   │   └── __init__.py
+│   └── common/                 # Utilitários comuns
+│       └── __init__.py
+├── docker/
+├── docker-compose.yml
+├── .env.example
+├── .gitignore
+└── README.md
+```
 
-## [*] Card 1 — Criar estrutura inicial do projeto
+## Eventos do Projeto
 
-Descrição: Organizar Command API, Query API, Worker, infraestrutura Docker e componentes compartilhados.
+### ProductCreated
 
-## [*] Card 2 — Configurar ambiente Docker
+Publicado quando um novo produto é criado no Command Side.
+
+```json
+{
+  "event": "ProductCreated",
+  "product_id": 1,
+  "name": "Mechanical Keyboard",
+  "price": 399.90,
+  "category": "Keyboards"
+}
+```
+
+### ProductUpdated
+
+Publicado quando um produto existente é alterado.
+
+```json
+{
+  "event": "ProductUpdated",
+  "product_id": 1,
+  "name": "Mechanical Keyboard RGB",
+  "price": 449.90,
+  "category": "Keyboards"
+}
+```
+
+### ProductDeleted
+
+Publicado quando um produto é removido.
+
+```json
+{
+  "event": "ProductDeleted",
+  "product_id": 1
+}
+```
+
+# [OK] Epic 1 — Fundação
+
+## [OK] Card 1 — Criar estrutura inicial do projeto
+
+Descrição: Criar a estrutura de diretórios definida em Estrutura do Projeto: command-api, query-api, projection-worker, shared/events, shared/schemas, shared/common, docker/ e docker-compose.yml.
+
+## [OK] Card 2 — Configurar ambiente Docker
 
 Descrição: Subir FastAPI, PostgreSQL, RabbitMQ, Redis e garantir comunicação entre containers.
 
-## [*] Card 3 — Configurar persistência inicial
+## [OK] Card 3 — Configurar persistência inicial
 
 Descrição: Criar banco PostgreSQL exclusivo para operações de escrita (Command Side).
 
@@ -74,9 +178,9 @@ Descrição: Criar banco PostgreSQL exclusivo para operações de escrita (Comma
 
 Descrição: Criar entidade Product com regras de negócio e persistência no banco principal.
 
-## [*] Card 5 — Criar API de comandos
+## [*] Card 5 — Criar endpoint de criação de produtos
 
-Descrição: Implementar criação, atualização e remoção de produtos utilizando apenas Command Side.
+Descrição: Implementar apenas a criação de produtos no Command Side.
 
 ## [*] Card 6 — Persistir comandos corretamente
 
@@ -194,16 +298,18 @@ Product
 - description
 - price
 - stock
-- category_id
+- category
 
 Já no Query Side, armazenado no Redis, você pode manter um documento pronto para consumo:
 
+```json
 {
   "id": 10,
   "name": "Mechanical Keyboard",
   "price": 399.90,
-  "category": "Peripherals",
+  "category": "Keyboards",
   "in_stock": true
 }
+```
 
-Perceba que a categoria já vem resolvida, campos derivados já estão calculados e o formato é otimizado para leitura. É justamente essa liberdade de ter dois modelos diferentes para dois objetivos diferentes que faz o CQRS valer a pena. Quando você chegar ao Projeto 05 (Kafka), verá que o RabbitMQ usado aqui para propagar eventos pode ser substituído por uma plataforma de streaming, mas a ideia de manter projeções e modelos de leitura independentes continuará exatamente a mesma.
+Perceba que campos derivados já estão calculados e o formato é otimizado para leitura. É justamente essa liberdade de ter dois modelos diferentes para dois objetivos diferentes que faz o CQRS valer a pena. Quando você chegar ao Projeto 05 (Kafka), verá que o RabbitMQ usado aqui para propagar eventos pode ser substituído por uma plataforma de streaming, mas a ideia de manter projeções e modelos de leitura independentes continuará exatamente a mesma.
