@@ -87,8 +87,15 @@ Banco em memória utilizado como modelo de leitura (Read Model), armazenando pro
 │       ├── config.py
 │       ├── database.py
 │       ├── main.py
-│       └── models/
-│           └── __init__.py
+│       ├── models/
+│       │   ├── __init__.py
+│       │   └── product.py
+│       ├── schemas/
+│       │   ├── __init__.py
+│       │   └── product.py
+│       └── repositories/
+│           ├── __init__.py
+│           └── product.py
 ├── query-api/                  # API de leitura (FastAPI)
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -172,31 +179,31 @@ Descrição: Subir FastAPI, PostgreSQL, RabbitMQ, Redis e garantir comunicação
 
 Descrição: Criar banco PostgreSQL exclusivo para operações de escrita (Command Side).
 
-# [*] Epic 2 — Command Side
+# [OK] Epic 2 — Command Side
 
-## [*] Card 4 — Implementar domínio de produtos
+## [OK] Card 4 — Implementar domínio de produtos
 
 Descrição: Criar entidade Product com regras de negócio e persistência no banco principal.
 
-## [*] Card 5 — Criar endpoint de criação de produtos
+## [OK] Card 5 — Criar endpoint de criação de produtos
 
 Descrição: Implementar apenas a criação de produtos no Command Side.
 
-## [*] Card 6 — Persistir comandos corretamente
+## [OK] Card 6 — Persistir comandos corretamente
 
 Descrição: Garantir que alterações sejam gravadas apenas no banco de escrita.
 
-# [*] Epic 3 — Eventos
+# [OK] Epic 3 — Eventos
 
-## [*] Card 7 — Configurar RabbitMQ
+## [OK] Card 7 — Configurar RabbitMQ
 
 Descrição: Preparar exchanges, filas e conexões para publicação de eventos de domínio.
 
-## [*] Card 8 — Publicar eventos de produto
+## [OK] Card 8 — Publicar eventos de produto
 
 Descrição: Emitir eventos após criar, atualizar ou remover produtos.
 
-## [*] Card 9 — Validar fluxo de eventos
+## [OK] Card 9 — Validar fluxo de eventos
 
 Descrição: Garantir publicação correta após cada alteração realizada pelo Command Side.
 

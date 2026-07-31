@@ -59,6 +59,9 @@ services:
         condition: service_healthy
     volumes:
       - ./command-api/app:/app
+      - ./shared:/shared
+    environment:
+      - PYTHONPATH=/app:/shared
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - cqrs-net
