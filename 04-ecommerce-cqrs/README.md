@@ -5,27 +5,76 @@
 
 O **CQRS E-commerce** é um projeto focado na aplicação do padrão **Command Query Responsibility Segregation (CQRS)** em um cenário de e-commerce. O objetivo é separar completamente as operações de escrita (**Command Side**) das operações de leitura (**Query Side**), utilizando eventos para manter ambos os modelos sincronizados. Durante o desenvolvimento serão explorados conceitos como consistência eventual, mensageria, projeções, modelos de leitura otimizados e comunicação assíncrona entre componentes.
 
-## Diagrama de Fluxo
+## Arquitetura
 
-                 Client
+### Visão Geral dos Componentes
 
-          POST           GET
-           │               │
-           ▼               ▼
-     Command API       Query API
-           │
-           ▼
-     PostgreSQL
-           │
-     ProductCreated
-           │
-       RabbitMQ
-           │
-   Projection Worker
-           │
-          Redis
-           │
-       Query API
+```mermaid
+flowchart TD
+    Client[Client<br/>curl / Insomnia]
+
+    subgraph CommandSide["COMMAND SIDE (escrita)"]
+        CommandAPI["Command API<br/>(FastAPI :8001)"]
+        Postgres[("PostgreSQL<br/>tabela: products")]
+    end
+
+    subgraph Messaging["MENSAGERIA"]
+        Exchange["Exchange: products<br/>tipo fanout"]
+        Queue["Fila: product_events"]
+    end
+
+    subgraph QuerySide["QUERY SIDE (leitura)"]
+        Worker["Projection Worker<br/>(consumidor)"]
+        Redis[("Redis<br/>hash: products")]
+        QueryAPI["Query API<br/>(FastAPI :8002)"]
+    end
+
+    Client -- "POST /products" --> CommandAPI
+    CommandAPI -- "1. grava" --> Postgres
+    CommandAPI -- "2. publica ProductCreated" --> Exchange
+    Exchange --> Queue
+    Queue -- "3. consome" --> Worker
+    Worker -- "4. atualiza Read Model" --> Redis
+    Client -- "GET /products" --> QueryAPI
+    QueryAPI -- "5. lê" --> Redis
+```
+
+### Sequência do Fluxo (criação de produto → consulta)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant CA as Command API
+    participant PG as PostgreSQL
+    participant RMQ as RabbitMQ
+    participant W as Projection Worker
+    participant R as Redis
+    participant QA as Query API
+
+    C->>CA: POST /products (criar produto)
+    CA->>PG: INSERT INTO products
+    CA->>RMQ: publica ProductCreated
+    RMQ->>W: entrega evento na fila
+    W->>R: HSET products {id} → read model
+    C->>QA: GET /products (consultar)
+    QA->>R: HGETALL products
+    QA-->>C: read model otimizado (JSON)
+```
+
+### Fluxo em Texto (resumo rápido)
+
+```
+Client ──POST──► Command API ──► PostgreSQL (escreve)
+                 Command API ──► RabbitMQ (publica ProductCreated)
+                                   │
+                                   ▼
+                            Projection Worker
+                                   │
+                                   ▼
+                                  Redis (read model)
+                                   ▲
+Client ──GET──► Query API ─────────┘
+```
 
 ---
 
@@ -108,6 +157,7 @@ Banco em memória utilizado como modelo de leitura (Read Model), armazenando pro
 │   ├── requirements.txt
 │   └── app/
 │       ├── __init__.py
+│       ├── config.py
 │       └── main.py
 ├── shared/
 │   ├── __init__.py
@@ -136,6 +186,7 @@ Publicado quando um novo produto é criado no Command Side.
   "product_id": 1,
   "name": "Mechanical Keyboard",
   "price": 399.90,
+  "stock": 10,
   "category": "Keyboards"
 }
 ```
@@ -150,6 +201,7 @@ Publicado quando um produto existente é alterado.
   "product_id": 1,
   "name": "Mechanical Keyboard RGB",
   "price": 449.90,
+  "stock": 5,
   "category": "Keyboards"
 }
 ```
@@ -207,17 +259,17 @@ Descrição: Emitir eventos após criar, atualizar ou remover produtos.
 
 Descrição: Garantir publicação correta após cada alteração realizada pelo Command Side.
 
-# [*] Epic 4 — Projection Worker
+# [OK] Epic 4 — Projection Worker
 
-## [*] Card 10 — Criar Projection Worker
+## [OK] Card 10 — Criar Projection Worker
 
 Descrição: Consumir eventos publicados e iniciar atualização do modelo de leitura.
 
-## [*] Card 11 — Processar eventos recebidos
+## [OK] Card 11 — Processar eventos recebidos
 
 Descrição: Interpretar eventos e preparar dados para consultas otimizadas.
 
-## [*] Card 12 — Atualizar Read Model
+## [OK] Card 12 — Atualizar Read Model
 
 Descrição: Sincronizar Redis sempre que novos eventos forem processados.
 

@@ -94,6 +94,9 @@ services:
         condition: service_healthy
     volumes:
       - ./projection-worker/app:/app
+      - ./shared:/shared
+    environment:
+      - PYTHONPATH=/app:/shared
     networks:
       - cqrs-net
 

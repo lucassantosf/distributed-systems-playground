@@ -1,6 +1,7 @@
 import json
 
 import pika
+from pika.exceptions import AMQPError
 
 from config import settings
 
@@ -18,19 +19,37 @@ def connect():
     channel.queue_bind(exchange="products", queue="product_events")
 
 
-def publish_event(event: dict):
-    global channel
+def _ensure_connected():
+    global connection, channel
     if channel is None or channel.is_closed:
         connect()
-    channel.basic_publish(
-        exchange="products",
-        routing_key="",
-        body=json.dumps(event).encode(),
-        properties=pika.BasicProperties(delivery_mode=2),
-    )
+    elif connection and connection.is_closed:
+        connect()
+
+
+def publish_event(event: dict):
+    try:
+        _ensure_connected()
+        channel.basic_publish(
+            exchange="products",
+            routing_key="",
+            body=json.dumps(event).encode(),
+            properties=pika.BasicProperties(delivery_mode=2),
+        )
+    except AMQPError:
+        connect()
+        channel.basic_publish(
+            exchange="products",
+            routing_key="",
+            body=json.dumps(event).encode(),
+            properties=pika.BasicProperties(delivery_mode=2),
+        )
 
 
 def close():
     global connection
     if connection and not connection.is_closed:
-        connection.close()
+        try:
+            connection.close()
+        except AMQPError:
+            pass

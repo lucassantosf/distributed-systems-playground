@@ -42,6 +42,7 @@ def create_product_endpoint(data: ProductCreate):
         "product_id": product.id,
         "name": product.name,
         "price": float(product.price),
+        "stock": product.stock,
         "category": product.category,
     })
 
