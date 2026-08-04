@@ -1,4 +1,5 @@
 import json
+import time
 
 import pika
 import redis
@@ -13,10 +14,13 @@ def callback(ch, method, properties, body):
     event = json.loads(body)
     print(f"Evento recebido: {json.dumps(event, ensure_ascii=False)}")
 
-    read_model = build_read_model(event)
-    print(f"Read Model: {json.dumps(read_model, ensure_ascii=False)}")
+    if settings.projection_delay_seconds:
+        time.sleep(settings.projection_delay_seconds)
 
-    redis_client.hset("products", read_model["id"], json.dumps(read_model))
+    read_model = build_read_model(event)
+    print(f"Read Model: {read_model.model_dump_json(ensure_ascii=False)}")
+
+    redis_client.hset("products", read_model.id, read_model.model_dump_json())
 
     ch.basic_ack(method.delivery_tag)
 

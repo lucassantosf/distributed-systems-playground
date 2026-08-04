@@ -59,9 +59,9 @@ services:
         condition: service_healthy
     volumes:
       - ./command-api/app:/app
-      - ./shared:/shared
+      - ./:/workspace
     environment:
-      - PYTHONPATH=/app:/shared
+      - PYTHONPATH=/app:/workspace
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - cqrs-net
@@ -78,6 +78,9 @@ services:
         condition: service_healthy
     volumes:
       - ./query-api/app:/app
+      - ./:/workspace
+    environment:
+      - PYTHONPATH=/app:/workspace
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - cqrs-net
@@ -94,9 +97,9 @@ services:
         condition: service_healthy
     volumes:
       - ./projection-worker/app:/app
-      - ./shared:/shared
+      - ./:/workspace
     environment:
-      - PYTHONPATH=/app:/shared
+      - PYTHONPATH=/app:/workspace
     networks:
       - cqrs-net
 

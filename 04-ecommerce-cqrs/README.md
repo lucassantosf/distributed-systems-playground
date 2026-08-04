@@ -151,23 +151,32 @@ Banco em memória utilizado como modelo de leitura (Read Model), armazenando pro
 │   └── app/
 │       ├── __init__.py
 │       ├── config.py
-│       └── main.py
+│       ├── main.py
+│       └── repositories/
+│           ├── __init__.py
+│           └── product.py
 ├── projection-worker/          # Consumidor de eventos
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
 │       ├── __init__.py
 │       ├── config.py
-│       └── main.py
+│       ├── main.py
+│       └── projection.py
 ├── shared/
 │   ├── __init__.py
 │   ├── events/                 # Definição dos eventos
 │   │   └── __init__.py
 │   ├── schemas/                # Schemas compartilhados
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── read_models/        # Read Models (contrato da leitura)
+│   │       ├── __init__.py
+│   │       └── product.py
 │   └── common/                 # Utilitários comuns
 │       └── __init__.py
 ├── docker/
+├── scripts/                    # Scripts de validação
+│   └── validate_eventual_consistency.py
 ├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
@@ -273,33 +282,155 @@ Descrição: Interpretar eventos e preparar dados para consultas otimizadas.
 
 Descrição: Sincronizar Redis sempre que novos eventos forem processados.
 
-# [*] Epic 5 — Query Side
+# [OK] Epic 5 — Query Side
 
-## [*] Card 13 — Criar Query API
+## [OK] Card 13 — Criar Query API
 
 Descrição: Implementar API dedicada exclusivamente para consultas rápidas.
 
-## [*] Card 14 — Buscar dados apenas do Redis
+Endpoints de leitura (leem apenas o Read Model no Redis):
+
+```bash
+# Listar todos os produtos (Read Model)
+curl http://localhost:8002/products
+
+# Buscar produto por id (Read Model)
+curl http://localhost:8002/products/{id}
+```
+
+Exemplo de resposta:
+
+```json
+[
+  {
+    "id": 20,
+    "name": "Monitor 27",
+    "price": 1299.0,
+    "category": "Display",
+    "in_stock": false
+  }
+]
+```
+
+Observação: `description` e `stock` não aparecem — o Read Model é desnormalizado e otimizado para consulta.
+
+## [OK] Card 14 — Buscar dados apenas do Redis
 
 Descrição: Nunca consultar PostgreSQL durante operações de leitura.
 
-## [*] Card 15 — Criar consultas otimizadas
+## [OK] Card 15 — Criar consultas otimizadas
 
 Descrição: Implementar listagens e buscas simplificadas utilizando o modelo de leitura.
 
-# [*] Epic 6 — Evolução do Modelo
+O `GET /products` aceita filtros, busca, ordenação e paginação (tudo em memória, apenas sobre o Read Model do Redis):
 
-## [*] Card 16 — Criar modelos independentes
+```bash
+# Filtro por categoria
+curl "http://localhost:8002/products?category=Display"
+
+# Filtro por disponibilidade em estoque
+curl "http://localhost:8002/products?in_stock=false"
+
+# Busca por nome (case-insensitive)
+curl "http://localhost:8002/products?q=monitor"
+
+# Ordenação por preço (asc/desc) ou nome
+curl "http://localhost:8002/products?sort=price&order=desc"
+
+# Paginação
+curl "http://localhost:8002/products?limit=2&offset=2"
+
+# Combinação
+curl "http://localhost:8002/products?category=Perifericos&in_stock=true&sort=price"
+```
+
+Query params suportados: `category`, `in_stock`, `q`, `sort` (`name`/`price`), `order` (`asc`/`desc`), `limit` (1–200), `offset`.
+
+# [OK] Epic 6 — Evolução do Modelo
+
+## [OK] Card 16 — Criar modelos independentes
 
 Descrição: Diferenciar estrutura do banco transacional e estrutura otimizada para consultas.
 
-## [*] Card 17 — Adicionar informações derivadas
+### Write Model vs Read Model
+
+| | Write Model | Read Model |
+|---|---|---|
+| Localização | `command-api/app/models/product.py` | `shared/schemas/read_models/product.py` |
+| Representação | Classe SQLAlchemy | Schema Pydantic |
+| Storage | Tabela `products` (PostgreSQL) | Hash `products` (Redis) |
+| Campos | `id, name, description, price, stock, category` | `id, name, price, category, in_stock` |
+| Dono | Command Side | Query Side (projetado pelo worker) |
+
+O Read Model agora é um **contrato explícito e único** em `shared/schemas/read_models/`, consumido pelo projection-worker (escreve) e pela Query API (lê) — a estrutura local duplicada na Query API foi removida.
+
+Nota: o campo `in_stock` já é um exemplo de evolução independente — foi adicionado ao Read Model (Card 11/12) sem tocar no Write Model.
+
+## [OK] Card 17 — Adicionar informações derivadas
 
 Descrição: Incluir campos calculados apenas no Read Model para acelerar consultas.
 
-## [*] Card 18 — Validar consistência eventual
+Campos derivados calculados **apenas** no Read Model (em `projection.py`, durante a projeção):
+
+| Campo | Derivado de | Para que serve |
+|---|---|---|
+| `in_stock` | `stock > 0` | Filtro sem calcular a cada requisição |
+| `formatted_price` | `price` formatado ("R$ 1.299,00") | Exibição pronta, sem formatação na leitura |
+| `price_tier` | `price` (<200 low, <1000 medium, senão high) | Filtro rápido por faixa de preço |
+| `name_normalized` | `name` em minúsculas | Busca (`q`) e ordenação (`sort=name`) sem `lower()` a cada leitura |
+
+```bash
+# Filtrar por faixa de preço (campo derivado)
+curl "http://localhost:8002/products?price_tier=high"
+
+# Busca usa name_normalized pré-calculado
+curl "http://localhost:8002/products?q=MOUSE"
+
+# Ordenação por nome usa name_normalized
+curl "http://localhost:8002/products?sort=name"
+```
+
+Exemplo de resposta (Read Model completo):
+
+```json
+{
+  "id": 26,
+  "name": "Mouse Gamer",
+  "price": 149.9,
+  "category": "Perifericos",
+  "in_stock": true,
+  "formatted_price": "R$ 149,90",
+  "price_tier": "low",
+  "name_normalized": "mouse gamer"
+}
+```
+
+## [OK] Card 18 — Validar consistência eventual
 
 Descrição: Observar atraso natural entre escrita e atualização do modelo de leitura.
+
+Em CQRS, a escrita é confirmada no Command Side imediatamente, mas o Read Model só é atualizado depois que o evento atravessa o RabbitMQ e é projetado pelo worker — existe uma **janela de consistência eventual** entre os dois.
+
+Script de validação (roda no host, sem dependências):
+
+```bash
+python scripts/validate_eventual_consistency.py
+```
+
+Saída típica:
+
+```
+[1] Escrita no Command API: id=29 (Consistencia Eventual 1785780010) em 28.6 ms
+[2] Consulta IMEDIATA no Query API: visivel? False
+[3] Produto visivel no Read Model apos 2 ms
+```
+
+Para tornar a janela observável (simular projeção lenta/atrasada), o worker aceita `PROJECTION_DELAY_SECONDS` (`.env`):
+
+```bash
+# .env
+PROJECTION_DELAY_SECONDS=2
+```
 
 # [*] Epic 7 — Atualizações
 
