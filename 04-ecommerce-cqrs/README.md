@@ -176,7 +176,8 @@ Banco em memória utilizado como modelo de leitura (Read Model), armazenando pro
 │       └── __init__.py
 ├── docker/
 ├── scripts/                    # Scripts de validação
-│   └── validate_eventual_consistency.py
+│   ├── validate_eventual_consistency.py
+│   └── validate_sync.py
 ├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
@@ -432,19 +433,74 @@ Para tornar a janela observável (simular projeção lenta/atrasada), o worker a
 PROJECTION_DELAY_SECONDS=2
 ```
 
-# [*] Epic 7 — Atualizações
+# [OK] Epic 7 — Atualizações
 
-## [*] Card 19 — Atualizar produtos
+## [OK] Card 19 — Atualizar produtos
 
 Descrição: Refletir alterações no banco principal e propagar eventos automaticamente.
 
-## [*] Card 20 — Remover produtos
+O `PUT /products/{id}` atualiza o produto no PostgreSQL (apenas os campos enviados) e publica `ProductUpdated`. O worker reprojeta o Read Model automaticamente.
+
+```bash
+# Atualização parcial (só os campos enviados)
+curl -X PUT http://localhost:8001/products/32 \
+  -H "Content-Type: application/json" \
+  -d '{"price": 179.9, "stock": 0}'
+
+# Limpar description (null explícito)
+curl -X PUT http://localhost:8001/products/32 \
+  -H "Content-Type: application/json" \
+  -d '{"description": null}'
+```
+
+Comportamento:
+- `404` se o produto não existe
+- `422` se a validação falhar (ex: `price <= 0`)
+- Campos derivados do Read Model (`in_stock`, `formatted_price`, `price_tier`, `name_normalized`) são recalculados na projeção
+
+## [OK] Card 20 — Remover produtos
 
 Descrição: Excluir registros e manter sincronização entre escrita e leitura.
 
-## [*] Card 21 — Validar sincronização completa
+O `DELETE /products/{id}` exclui o produto no PostgreSQL e publica `ProductDeleted`. O worker remove a chave do hash `products` no Redis (HDEL).
+
+```bash
+curl -X DELETE http://localhost:8001/products/34   # -> 204 No Content
+curl -X DELETE http://localhost:8001/products/999  # -> 404 Product not found
+```
+
+No worker (log de projeção):
+
+```
+Evento recebido: {"event": "ProductDeleted", "product_id": 34}
+ProductDeleted: produto 34 removido do Read Model (removidos=1)
+```
+
+Observação: a remoção do Read Model também respeita a janela de consistência eventual — se `PROJECTION_DELAY_SECONDS > 0`, o PostgreSQL já não tem o produto, mas o Redis ainda o serve até a projeção rodar.
+
+## [OK] Card 21 — Validar sincronização completa
 
 Descrição: Garantir consistência entre PostgreSQL, RabbitMQ, Worker e Redis.
+
+Script de validação de integração (roda no host, sem dependências):
+
+```bash
+python scripts/validate_sync.py
+```
+
+O que ele verifica:
+
+| Etapa | Verificação | Componentes |
+|---|---|---|
+| Criação | `POST /products` confirma escrita; fila do RabbitMQ drena para 0; produtos aparecem no Redis | PostgreSQL + RabbitMQ + Worker + Redis |
+| Conformidade | Campos (`name`, `price`, `category`) iguais no write e no read; `in_stock` derivado corretamente | PostgreSQL vs Redis |
+| Atualização | `PUT` reprojeta no Read Model (`price` e `in_stock` atualizados) | Todos |
+| Remoção | `DELETE` remove do Read Model e do PostgreSQL | Todos |
+| Limpeza | Fila drena após remover produtos de teste | RabbitMQ |
+
+Saída: `RESULTADO: 14 PASS, 0 FAIL` (exit code `0`; falhas → exit `1`).
+
+Para comparar os dois lados via HTTP, o Command API agora expõe `GET /products` (leitura direta do banco transacional — usada **apenas para validação/observabilidade**, nunca pelo fluxo de leitura da aplicação).
 
 # [*] Epic 8 — Resiliência
 

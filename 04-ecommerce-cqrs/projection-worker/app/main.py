@@ -6,6 +6,7 @@ import redis
 
 from config import settings
 from projection import build_read_model
+from shared.events.product import PRODUCT_DELETED
 
 redis_client = redis.from_url(settings.redis_url)
 
@@ -17,10 +18,14 @@ def callback(ch, method, properties, body):
     if settings.projection_delay_seconds:
         time.sleep(settings.projection_delay_seconds)
 
-    read_model = build_read_model(event)
-    print(f"Read Model: {read_model.model_dump_json(ensure_ascii=False)}")
-
-    redis_client.hset("products", read_model.id, read_model.model_dump_json())
+    if event.get("event") == PRODUCT_DELETED:
+        product_id = event["product_id"]
+        removed = redis_client.hdel("products", str(product_id))
+        print(f"ProductDeleted: produto {product_id} removido do Read Model (removidos={removed})")
+    else:
+        read_model = build_read_model(event)
+        print(f"Read Model: {read_model.model_dump_json(ensure_ascii=False)}")
+        redis_client.hset("products", read_model.id, read_model.model_dump_json())
 
     ch.basic_ack(method.delivery_tag)
 
