@@ -88,6 +88,7 @@ services:
   projection-worker:
     build: ./projection-worker
     container_name: cqrs_worker
+    restart: unless-stopped
     env_file:
       - .env
     depends_on:

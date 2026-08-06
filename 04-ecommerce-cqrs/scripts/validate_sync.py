@@ -54,7 +54,15 @@ def write_products() -> list[dict]:
 
 
 def read_models() -> list[dict]:
-    return http_json(f"{QUERY_API}/products")
+    all_items: list[dict] = []
+    offset = 0
+    while offset < 10000:
+        page = http_json(f"{QUERY_API}/products?limit=200&offset={offset}")
+        all_items.extend(page)
+        if len(page) < 200:
+            break
+        offset += 200
+    return all_items
 
 
 def main() -> None:

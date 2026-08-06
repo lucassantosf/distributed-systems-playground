@@ -166,7 +166,8 @@ Banco em memória utilizado como modelo de leitura (Read Model), armazenando pro
 ├── shared/
 │   ├── __init__.py
 │   ├── events/                 # Definição dos eventos
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── product.py
 │   ├── schemas/                # Schemas compartilhados
 │   │   ├── __init__.py
 │   │   └── read_models/        # Read Models (contrato da leitura)
@@ -174,15 +175,39 @@ Banco em memória utilizado como modelo de leitura (Read Model), armazenando pro
 │   │       └── product.py
 │   └── common/                 # Utilitários comuns
 │       └── __init__.py
-├── docker/
-├── scripts/                    # Scripts de validação
+├── scripts/                    # Scripts de validação e utilitários
+│   ├── benchmark_queries.py            # Benchmark PostgreSQL vs Redis (Card 25)
+│   ├── rebuild_read_model.py           # Reconciliação do Read Model pós-restart (Card 27)
 │   ├── validate_eventual_consistency.py
+│   ├── validate_flow_complete.py       # Fluxo completo ponta a ponta (Card 27)
+│   ├── validate_scalability.py         # Escalabilidade leitura/escrita (Card 26)
 │   └── validate_sync.py
 ├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
 └── README.md
 ```
+
+## Como executar
+
+Pré-requisitos: Docker e Docker Compose.
+
+```bash
+cp .env.example .env      # ajuste credenciais se necessário
+docker compose up -d      # sobe postgres, redis, rabbitmq e as 3 aplicações
+```
+
+| Componente | Endereço |
+|---|---|
+| Command API (escrita) | http://localhost:8001 |
+| Query API (leitura) | http://localhost:8002 |
+| Painel RabbitMQ | http://localhost:15672 (guest/guest) |
+| PostgreSQL | localhost:5432 (`command_db`) |
+| Redis | localhost:6379 |
+
+Health checks: `curl http://localhost:8001/health` e `curl http://localhost:8002/health`.
+
+> Nota: RabbitMQ e Redis não usam volume. Ao recriar os containers (`docker compose down`), a fila é recriada do zero e o Read Model é perdido — o PostgreSQL preserva os dados. Use `scripts/rebuild_read_model.py` para reconciliar o Redis (veja o Card 27).
 
 ## Eventos do Projeto
 
@@ -296,10 +321,10 @@ Endpoints de leitura (leem apenas o Read Model no Redis):
 curl http://localhost:8002/products
 
 # Buscar produto por id (Read Model)
-curl http://localhost:8002/products/{id}
+curl http://localhost:8002/products/20
 ```
 
-Exemplo de resposta:
+Exemplo de resposta (Read Model completo, com os campos derivados do Card 17):
 
 ```json
 [
@@ -308,12 +333,15 @@ Exemplo de resposta:
     "name": "Monitor 27",
     "price": 1299.0,
     "category": "Display",
-    "in_stock": false
+    "in_stock": false,
+    "formatted_price": "R$ 1.299,00",
+    "price_tier": "high",
+    "name_normalized": "monitor 27"
   }
 ]
 ```
 
-Observação: `description` e `stock` não aparecem — o Read Model é desnormalizado e otimizado para consulta.
+Observação: `description` e `stock` não aparecem — o Read Model é desnormalizado e otimizado para consulta, com os campos derivados já calculados na projeção.
 
 ## [OK] Card 14 — Buscar dados apenas do Redis
 
@@ -502,40 +530,204 @@ Saída: `RESULTADO: 14 PASS, 0 FAIL` (exit code `0`; falhas → exit `1`).
 
 Para comparar os dois lados via HTTP, o Command API agora expõe `GET /products` (leitura direta do banco transacional — usada **apenas para validação/observabilidade**, nunca pelo fluxo de leitura da aplicação).
 
-# [*] Epic 8 — Resiliência
+# [OK] Epic 8 — Resiliência
 
-## [*] Card 22 — Tratar falhas no processamento
+## [OK] Card 22 — Tratar falhas no processamento
 
 Descrição: Evitar perda de eventos durante falhas temporárias do Worker.
 
-## [*] Card 23 — Implementar retry
+Antes: uma falha (ex: Redis fora do ar) derrubava o `start_consuming()` e o worker morria sem restart policy — eventos ficavam presos na fila indefinidamente.
+
+Na época do Card 22, o callback passou a envolver o processamento em `try/except` (sucesso → `basic_ack`; falha → `basic_nack(requeue=True)` + `sleep(1s)`), e o worker ganhou `restart: unless-stopped` — se o processo cair, o Docker reinicia e as mensagens não-acknowledged são redeliveradas. **Nenhum evento se perdia em falha temporária.**
+
+> Evolução (Cards 23–24): o `requeue` simples foi substituído por retry com contador (`x-retry-count`) e backoff exponencial, e o descarte definitivo passou a ir para a DLQ. A garantia de não perder eventos continua, mas os logs atuais mostram `ERRO ... -> republicada com x-retry-count=N` em vez de requeue.
+
+Validação (simulando Redis fora do ar, com o código atual):
+
+```bash
+docker compose stop redis                  # indisponibilidade
+curl -X POST http://localhost:8001/products -H "Content-Type: application/json" \
+  -d '{"name":"Durante Falha","price":123.45,"stock":7,"category":"Teste"}'   # escrita OK
+docker compose logs projection-worker      # ERRO (tentativa 1/3) ... -> republicada com x-retry-count=1
+docker compose start redis                 # recuperação
+docker compose logs projection-worker      # Mensagem N processada e confirmada (acked)
+curl http://localhost:8002/products?q=durante   # produto presente: nada foi perdido
+```
+
+## [OK] Card 23 — Implementar retry
 
 Descrição: Reprocessar mensagens que falharem antes do descarte definitivo.
 
-## [*] Card 24 — Adicionar Dead Letter Queue
+O Card 22 fazia requeue infinito com atraso fixo. Agora o retry é controlado:
+
+- **Contador de tentativas**: o worker lê o header `x-retry-count` da mensagem (`MAX_RETRIES` padrão 3). Como o RabbitMQ **não** adiciona `x-death` em requeue simples, na falha o worker **republica** a mensagem no final da fila com o header incrementado e faz ack da original.
+- **Backoff exponencial**: espera `RETRY_BASE_DELAY_SECONDS * 2^(tentativa-1)` entre tentativas (1s, 2s, 4s...).
+- **Descarte definitivo**: ao atingir `MAX_RETRIES`, `basic_nack(requeue=False)` remove a mensagem da fila (o Card 24 a encaminhará para a DLQ).
+
+Configuração (`.env`):
+
+```
+MAX_RETRIES=3
+RETRY_BASE_DELAY_SECONDS=1.0
+```
+
+Validação (mensagem malformada → sempre falha):
+
+```
+Evento recebido (tentativa 1/3): {"event": "ProductCreated", "product_id": 7777}
+ERRO (tentativa 1/3): 'name' -> republicada com x-retry-count=1, novo retry em 1.0s
+Evento recebido (tentativa 2/3): ... novo retry em 2.0s
+Evento recebido (tentativa 3/3): ...
+ERRO (tentativa 3 >= max 3): 'name' -> DESCARTE definitivo da mensagem 9
+```
+
+Falha temporária (Redis fora do ar) que se resolve dentro do limite:
+
+```
+ERRO (tentativa 1/3): ... -> republicada com x-retry-count=1, novo retry em 1.0s
+ERRO (tentativa 2/3): ... -> republicada com x-retry-count=2, novo retry em 2.0s
+Mensagem 12 processada e confirmada (acked)   # Redis voltou na tentativa 3
+```
+
+## [OK] Card 24 — Adicionar Dead Letter Queue
 
 Descrição: Direcionar mensagens inválidas para análise posterior.
 
-# [*] Epic 9 — Performance
+Ao esgotar `MAX_RETRIES`, o Card 23 descartava a mensagem com `basic_nack(requeue=False)`. Agora esse descarte é qualificado: a mensagem vai para a **DLQ** em vez de se perder.
 
-## [*] Card 25 — Medir ganho das consultas
+Implementação com **dead-letter exchange (DLX)** nativo do RabbitMQ:
+
+- A fila `product_events` é declarada com o argumento `x-dead-letter-exchange: product_events.dlx`.
+- O worker declara o exchange `product_events.dlx` (fanout) e a fila `product_events.dlq`, bindada a ele.
+- Quando `basic_nack(requeue=False)` é chamado, o próprio RabbitMQ roteia a mensagem para a DLQ — o worker não publica na DLQ manualmente.
+- Nomes configuráveis em `config.py` (`dlq_exchange`, `dlq_queue`).
+
+Validação (mensagem malformada → 3 tentativas → DLQ):
+
+```
+Evento recebido (tentativa 1/3): {"event": "ProductCreated", "product_id": 6666}
+ERRO (tentativa 1/3): 'name' -> republicada com x-retry-count=1, novo retry em 1.0s
+Evento recebido (tentativa 3/3): {"event": "ProductCreated", "product_id": 6666}
+ERRO (tentativa 3 >= max 3): 'name' -> DESCARTE definitivo da mensagem 3
+
+# Filas após o ciclo:
+product_events     | messages: 0  | DLX: product_events.dlx
+product_events.dlq | messages: 1  | payload: {"event":"ProductCreated","product_id":6666} | x-retry-count: 2
+```
+
+A mensagem na DLQ carrega o header `x-retry-count: 2` (processada 3x) e pode ser inspecionada/consumida para análise posterior sem interferir no fluxo principal. A fila principal nunca fica poluída por mensagens mortas.
+
+> Nota: a fila `product_events` só ganha o argumento DLX na (re)criação — como o RabbitMQ não tem volume neste projeto, basta recriar a fila via API (`DELETE /api/queues/%2F/product_events`) e subir o worker de novo.
+
+# [OK] Epic 9 — Performance
+
+## [OK] Card 25 — Medir ganho das consultas
 
 Descrição: Comparar consultas utilizando PostgreSQL e Redis separadamente.
 
-## [*] Card 26 — Validar escalabilidade
+Benchmark em `scripts/benchmark_queries.py` (`python3 scripts/benchmark_queries.py [N]`). Ele semeia N produtos via Command API (escreve no PostgreSQL + projeta no Redis), mede as consultas e limpa os dados no final.
+
+Com 1000 produtos:
+
+**Nível de armazenamento** (psql vs redis-cli, clientes reconectando a cada iteração — idêntico para ambos):
+
+```
+consulta                     media
+PG SELECT * (todos)         20.53 ms
+Redis HGETALL (todos)       11.01 ms   -> 1.9x mais rápido
+PG SELECT WHERE id          15.85 ms
+Redis HGET <id>              9.49 ms   -> 1.7x mais rápido
+```
+
+**Nível de API** (HTTP + JSON; PG faz 1 chamada retornando todos, Redis paginado em limit=200):
+
+```
+consulta                     media
+PG list (1 chamada)         24.24 ms
+Redis list total (5 chamadas) 67.05 ms   -> varredura total: PG vence (0.4x)
+Redis get (1 chamada)         2.46 ms    -> lookup pontual: Redis vence
+```
+
+Leitura honesta dos números:
+
+- **Lookup pontual** (padrão de leitura típico do CQRS): Redis `GET /products/{id}` ≈ 2.5 ms via HTTP — o Read Model já vem pronto, sem JOIN nem serialização derivada.
+- **Varredura completa**: Redis paginado (limit máx. 200 → 5 chamadas) perde para o `SELECT` único do PostgreSQL (1 round-trip vs 5). O Read Model compensa em leituras pontuais, filtros e campos pré-calculados — não em despejar a tabela inteira.
+- **Isolamento**: essas consultas Redis não tocam o banco de escrita, então a leitura nunca disputa recurso com a escrita.
+
+## [OK] Card 26 — Validar escalabilidade
 
 Descrição: Demonstrar independência entre operações de leitura e escrita.
 
-# [*] Epic 10 — Fluxo Final
+Validação em `scripts/validate_scalability.py` (`python3 scripts/validate_scalability.py [N]`). Semeia N produtos, sobe uma **2ª instância da Query API** (`docker run` na porta :8003 apontando para o mesmo Redis), submete carga de leitura e depois leitura + escrita concorrentes, medindo o PostgreSQL via `pg_stat_user_tables`.
 
-## [*] Card 27 — Executar fluxo completo
+Resultado (N=300):
+
+```
+1) SEMEANDO 300 produtos                       [PASS]
+2) 2a instancia de leitura (:8003) responde    [PASS]
+   ambas instancias leem os MESMOS dados       [PASS]
+3) 1600 leituras a 279 req/s (media 27.7ms)    [PASS]
+   tabela products: seq_scan 844 -> 844 | idx_scan 9776 -> 9776  (INTOCADA)
+4) leitura + 30 escritas concorrentes          [PASS]
+   leituras 277 req/s | escritas media 40.2ms, p95 70.3ms
+RESULTADO: 7 PASS, 0 FAIL
+```
+
+A independência fica provada em três camadas:
+
+- **Escalar leitura**: subir outra instância da Query API é só um container — basta apontar para o mesmo Redis, sem tocar em nada de escrita.
+- **Leitura não toca a escrita**: durante 1600 leituras em 2 instâncias, o PostgreSQL não sofreu uma única scan (seq_scan e idx_scan idênticos) — as consultas saem todas do Redis.
+- **Escrita não é afetada pela carga de leitura**: POST/DELETE concorrentes completam com p95 de 70ms enquanto a leitura roda a 277 req/s.
+
+### Bugs reais encontrados e corrigidos na validação
+
+1. **Contrato da fila quebrado pelo Card 24**: o `broker.py` do Command API declarava `product_events` sem o argumento DLX; após qualquer reconexão, o RabbitMQ respondia `406 PRECONDITION_FAILED` e **toda escrita virava 500**. Como toda declaração de fila é um contrato, o Command API passou a declarar com os mesmos `x-dead-letter-exchange`/`x-dead-letter-routing-key`. (O `validate_sync` não pegava porque a conexão antiga continuava viva — só falha na reconexão.)
+2. **Pika não é thread-safe**: publicações concorrentes no mesmo canal geravam `StreamLostError: pop from an empty deque`. O `publish_event` agora serializa com `threading.Lock` → 30 escritas concorrentes: 30/30 OK.
+
+### Latência de leitura com paginação
+
+`scripts/validate_sync.py` e `validate_scalability.py` leem o Read Model completo via **paginação** (`limit=200`), porque a Query API limita cada página a 200 registros — a lista padrão tem limite de 100.
+
+# [OK] Epic 10 — Fluxo Final
+
+## [OK] Card 27 — Executar fluxo completo
 
 Descrição: Criar produto, publicar evento, atualizar Read Model e consultar pelo Query Side.
 
-O que mais gosto nesse projeto
+Fechamento com `scripts/validate_flow_complete.py` — o ciclo de vida completo de um produto atravessando as quatro camadas:
+
+```
+1) ESCREVER  POST /products -> 201, id=3998 (persistido no PostgreSQL)      [PASS]
+2) PUBLICAR  fila recebe o evento ProductCreated e drena                     [PASS]
+3) PROJETAR  Read Model no Redis: price_tier=high, formatted_price="R$ 1.299,90",
+             name_normalized="fluxo completo"                                [PASS]
+4) LER       GET /products/3998 (Redis) -> json completo do Read Model       [PASS]
+5) ATUALIZAR PUT price=99.9/stock=0 -> reprojetado (low, "R$ 99,90")         [PASS]
+6) REMOVER   DELETE -> sumiu do Read Model + GET 404                         [PASS]
+RESULTADO: 7 PASS, 0 FAIL
+```
+
+Todo o pipeline — Command API (PostgreSQL) → RabbitMQ → Projection Worker → Redis → Query API — funciona ponta a ponta: o modelo de escrita e o Read Model evoluem juntos, mas vivem em bancos separados e nunca se confundem.
+
+### Reconstrução do Read Model (reconciliação pós-restart)
+
+O Redis não tem volume neste projeto — o Read Model é **efêmero**. Se o container do Redis for recriado (`docker compose down`), as projeções se perdem, enquanto o PostgreSQL (com volume) preserva o modelo de escrita. O estado fica assimétrico até que novos eventos fluam.
+
+Para restaurar a consistência sem precisar de replay de eventos (event sourcing), o projeto inclui uma **reconciliação** que reconstrói o Read Model a partir da fonte de verdade:
+
+```bash
+docker compose exec projection-worker python /workspace/scripts/rebuild_read_model.py [--clean-test]
+```
+
+- Lê todos os produtos do `GET /products` do Command API (PostgreSQL).
+- Purga o hash `products` no Redis e reprojeta tudo com o mesmo `build_read_model` usado pelo worker — campos derivados inclusos.
+- `--clean-test`: antes de reconstruir, remove do PostgreSQL os produtos residuais de validação (prefixos `Sync`, `Consistencia`, `Conc`, `Bench`, `Scale`, `Teste Validacao`).
+
+Esse padrão de *reconciliação a partir do banco de escrita* é a alternativa pragmática ao replay de eventos quando o Read Model é derivado e descartável — exatamente o caso de uso de um cache de leitura em CQRS.
+
+## O que mais gosto nesse projeto
 
 Esse projeto ensina algo que pouca gente pratica em estudos: os modelos de escrita e leitura não precisam ser iguais.
-
 Por exemplo, no Command Side, você pode ter uma entidade normal:
 
 Product

@@ -1,4 +1,5 @@
 import json
+import threading
 
 import pika
 from pika.exceptions import AMQPError
@@ -7,6 +8,7 @@ from config import settings
 
 connection: pika.BlockingConnection | None = None
 channel: pika.adapters.blocking_connection.BlockingChannel | None = None
+_publish_lock = threading.Lock()
 
 
 def connect():
@@ -15,7 +17,14 @@ def connect():
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
     channel.exchange_declare(exchange="products", exchange_type="fanout", durable=True)
-    channel.queue_declare(queue="product_events", durable=True)
+    channel.queue_declare(
+        queue="product_events",
+        durable=True,
+        arguments={
+            "x-dead-letter-exchange": settings.dlq_exchange,
+            "x-dead-letter-routing-key": settings.dlq_queue,
+        },
+    )
     channel.queue_bind(exchange="products", queue="product_events")
 
 
@@ -28,22 +37,23 @@ def _ensure_connected():
 
 
 def publish_event(event: dict):
-    try:
-        _ensure_connected()
-        channel.basic_publish(
-            exchange="products",
-            routing_key="",
-            body=json.dumps(event).encode(),
-            properties=pika.BasicProperties(delivery_mode=2),
-        )
-    except AMQPError:
-        connect()
-        channel.basic_publish(
-            exchange="products",
-            routing_key="",
-            body=json.dumps(event).encode(),
-            properties=pika.BasicProperties(delivery_mode=2),
-        )
+    with _publish_lock:
+        try:
+            _ensure_connected()
+            channel.basic_publish(
+                exchange="products",
+                routing_key="",
+                body=json.dumps(event).encode(),
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+        except AMQPError:
+            connect()
+            channel.basic_publish(
+                exchange="products",
+                routing_key="",
+                body=json.dumps(event).encode(),
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
 
 
 def close():
