@@ -17,8 +17,9 @@ Ao final, a aplicação representará uma plataforma de Event Streaming capaz de
 ## 🚀 Stack
 
 - **FastAPI** — APIs responsáveis pela publicação contínua de eventos na plataforma.
-- **Apache Kafka** — Plataforma de Event Streaming utilizada para armazenamento e distribuição dos eventos.
-- **PostgreSQL** — Persistência de dados utilizados pelos produtores e consumidores quando necessário.
+- **Apache Kafka (KRaft mode)** — Plataforma de Event Streaming sem dependência de Zookeeper, utilizando o modo KRaft nativo das versões modernas do Kafka.
+- **confluent-kafka** — Biblioteca cliente Python para produção e consumo de eventos no Kafka (wrapper do librdkafka, padrão de mercado).
+- **PostgreSQL** — Um único container com um database dedicado por serviço (ex.: `db_producer`, `db_billing`, `db_analytics`).
 - **Docker & Docker Compose** — Orquestração de toda a infraestrutura local.
 - **Kafka UI** — Visualização de Topics, Partitions, Consumer Groups, Offsets e mensagens publicadas.
 
@@ -47,7 +48,7 @@ Para dar contexto real aos conceitos abordados, a plataforma adota o domínio de
 * **Eventos:** ciclo de vida do pedido (ex.: `OrderCreated`, `OrderUpdated`), definidos na camada `shared/events`.
 * **Message Key:** `order_id` — garante que eventos do mesmo pedido sejam gravados em uma única partição, preservando a ordenação.
 * **Topics (sugestão inicial):** `orders.created` (e demais eventos do ciclo), com tópicos `-retry` e `-dlt` correspondentes nas etapas de tratamento de falhas.
-* **Persistência:** o producer-api persiste o pedido no PostgreSQL antes de publicar (SQLAlchemy + Alembic); cada consumidor pode persistir seus próprios resultados (ex.: fatura no billing, métricas no analytics).
+* **Persistência:** um único container PostgreSQL com um database por serviço (ex.: `db_producer`, `db_billing`, `db_analytics`). O producer-api persiste o pedido antes de publicar (SQLAlchemy + Alembic); cada consumidor persiste seus próprios resultados no database correspondente.
 * **Consumidores ativos:** além de consumir, o inventory-consumer reserva estoque e publica eventos derivados (ex.: `InventoryReserved`), demonstrando que um consumidor também pode ser produtor.
 
 **Envelope padrão dos eventos** (referência de contrato — implementação no Card 4):
@@ -281,19 +282,19 @@ Decisões de escopo desta trilha:
 * **Persistência:** producer-api e consumidores persistem dados no PostgreSQL (SQLAlchemy + Alembic).
 * **Testes:** sem testes automatizados — a validação será manual (curl, Kafka UI e scripts auxiliares).
 
-# [*] Epic 1 — Fundação da Plataforma
+# [OK] Epic 1 — Fundação da Plataforma
 
-### [*] Card 1 — Criar estrutura inicial do projeto
+### [OK] Card 1 — Criar estrutura inicial do projeto
 **Descrição:** Organizar a estrutura base do projeto separando Producer API, Consumers, componentes compartilhados e arquivos de infraestrutura, preparando um ambiente limpo para evolução incremental da plataforma.
 
 ---
 
-### [*] Card 2 — Configurar ambiente Docker
+### [OK] Card 2 — Configurar ambiente Docker
 **Descrição:** Configurar Docker Compose contendo Apache Kafka, PostgreSQL e Kafka UI, garantindo a comunicação entre a infraestrutura. As aplicações FastAPI serão adicionadas ao Compose nas etapas em que forem criadas.
 
 ---
 
-### [*] Card 3 — Validar infraestrutura Kafka
+### [OK] Card 3 — Validar infraestrutura Kafka
 **Descrição:** Confirmar que todos os containers estão operacionais, validar o cluster através do Kafka UI e garantir que os serviços conseguem se comunicar corretamente.
 
 ---
@@ -403,7 +404,7 @@ Decisões de escopo desta trilha:
 # [*] Epic 8 — Tratamento de Falhas
 
 ### [*] Card 22 — Implementar Retry
-**Descrição:** Reprocessar automaticamente eventos que apresentarem falhas temporárias durante sua execução, utilizando retry topics com backoff no consumidor (ex.: `orders.created-retry`).
+**Descrição:** Reprocessar automaticamente eventos que apresentarem falhas temporárias durante sua execução, utilizando **retry topics com consumidor separado e backoff** (ex.: `orders.created-retry`). Ao falhar, o consumidor principal publica a mensagem no tópico `-retry`; um segundo consumidor dedicado processa esse tópico com delay progressivo antes de encaminhar ao DLT caso as tentativas se esgotem.
 
 ---
 
