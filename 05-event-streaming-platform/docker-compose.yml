@@ -1,13 +1,15 @@
 # =============================================================================
 # 05 — Event Streaming Platform
 # =============================================================================
-# Infraestrutura local da plataforma:
+# Serviços da plataforma:
 #   - Apache Kafka (KRaft mode, sem Zookeeper)
 #   - PostgreSQL  (um database por serviço)
 #   - Kafka UI    (visualização do ecossistema Kafka)
+#   - Producer API (FastAPI — Card 5)
 #
-# As aplicações FastAPI (producer-api e consumers) serão adicionadas
-# ao Compose nas etapas em que forem desenvolvidas (Cards 5 e 9+).
+# Ordem de inicialização garantida por healthchecks + depends_on:
+#   postgres (healthy) → kafka (healthy) → producer-api (migrations + uvicorn)
+#                     → kafka-ui
 # =============================================================================
 
 services:
@@ -46,7 +48,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0        # sem delay para dev
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"          # tópicos criados via script (Card 7)
+      # TODO Card 7: mudar para "false" após criar tópicos explicitamente via create-topics.sh
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"            # habilitado temporariamente para Cards 5 e 6
       KAFKA_LOG_RETENTION_HOURS: 168                   # retenção padrão: 7 dias (Card 19)
       KAFKA_NUM_PARTITIONS: 3                          # padrão de partições (Card 10)
     volumes:
@@ -78,6 +81,36 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Producer API — FastAPI que recebe pedidos e publica eventos no Kafka
+  # Acesso: http://localhost:8000 | Docs: http://localhost:8000/docs
+  # ---------------------------------------------------------------------------
+  producer-api:
+    build:
+      context: ./producer-api
+      dockerfile: Dockerfile
+    container_name: producer-api
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/db_producer
+      PYTHONUNBUFFERED: "1"   # logs em tempo real no docker compose logs
+    volumes:
+      - ./shared:/app/shared   # shared/ montado como volume (Card 1: decisão de estratégia)
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: on-failure        # reinicia se o entrypoint falhar (ex.: migration race condition)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s        # acomoda tempo de build de imagem + migrations + uvicorn warm-up
 
   # ---------------------------------------------------------------------------
   # Kafka UI — visualização de Topics, Partitions, Consumer Groups e Offsets

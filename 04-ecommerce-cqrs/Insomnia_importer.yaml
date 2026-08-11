@@ -1,0 +1,265 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: 04-ecommerce-cqrs
+meta:
+  id: wrk_6dd409c8c93640099f2b2c3737f3f632
+  created: 1785358206709
+  modified: 1785358206709
+  description: ""
+collection:
+  - name: Command API
+    meta:
+      id: fld_5f48f64bd6a447209428b27e445288fb
+      created: 1784230271572
+      modified: 1785358258041
+      sortKey: -1782678752675.75
+      description: ""
+    children:
+      - url: "{{ _.base_url_command_api }}health"
+        name: Heath
+        meta:
+          id: req_3fa7f5e1411d4da7a7866de11be245e0
+          created: 1784230271572
+          modified: 1785358352811
+          isPrivate: false
+          description: ""
+          sortKey: -1784230172986
+        method: GET
+        headers:
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url_command_api }}products"
+        name: Store Product
+        meta:
+          id: req_a7f6d5ebd26c4978825ba9a307c181ff
+          created: 1785444852099
+          modified: 1785862588975
+          isPrivate: false
+          description: ""
+          sortKey: -1765428900708.5
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+            	"name":"Notebook new",
+            	"category":"info",
+            	"price":100
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url_command_api }}products/33"
+        name: Update Product
+        meta:
+          id: req_f8d6ce02abfe40aa9d96853db76cf592
+          created: 1785862420701
+          modified: 1785862610372
+          isPrivate: false
+          description: ""
+          sortKey: -1756028264569.75
+        method: PUT
+        body:
+          mimeType: application/json
+          text: |-
+            {
+            	"name":"Notebook updated",
+            	"category":"info",
+            	"price":100
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url_command_api }}products/36"
+        name: Destroy Product
+        meta:
+          id: req_f65505ef234a4a678e4757d14cd8a6de
+          created: 1785862984990
+          modified: 1785863011781
+          isPrivate: false
+          description: ""
+          sortKey: -1751327946500.375
+        method: DELETE
+        headers:
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Query API
+    meta:
+      id: fld_46296e7a93bc435e8f842dc280e3e3e7
+      created: 1785358366261
+      modified: 1785358366261
+      sortKey: -1782420183973.375
+      description: ""
+    children:
+      - url: "{{ _.base_url_query_api }}health"
+        name: Heath
+        meta:
+          id: req_0f734f7bb1ca416ea8cdb9ffb6ebbdf5
+          created: 1785358366261
+          modified: 1785358377315
+          isPrivate: false
+          description: ""
+          sortKey: -1784230172986
+        method: GET
+        headers:
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url_query_api }}products"
+        name: Index Products
+        meta:
+          id: req_c04d9d790ee04405bd7de4073c002d82
+          created: 1785763860767
+          modified: 1785779186323
+          isPrivate: false
+          description: ""
+          sortKey: -1774829536847.25
+        method: GET
+        headers:
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url_query_api }}products/36"
+        name: Show Product
+        meta:
+          id: req_5fafd4c9141343a684a273d873aa3882
+          created: 1785763881145
+          modified: 1785863006953
+          isPrivate: false
+          description: ""
+          sortKey: -1770129218777.875
+        method: GET
+        headers:
+          - name: User-Agent
+            value: insomnia/11.0.2
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_a4625c2ac20641c883735929e1d4edf1
+    created: 1746369733802
+    modified: 1772748716638
+  cookies:
+    - id: 10afb9ff-2a69-4654-b7ac-379ee600949b
+      key: KEYCLOAK_LOCALE
+      value: ""
+      domain: localhost
+      path: /realms/YETZ/
+      secure: false
+      httpOnly: true
+      extensions:
+        - Version=1
+        - Comment=Expiring cookie
+      hostOnly: true
+    - id: c0e6576f-887c-432f-b43a-0a3c396d52c7
+      key: KC_RESTART
+      value: ""
+      domain: localhost
+      path: /realms/YETZ/
+      secure: false
+      httpOnly: true
+      extensions:
+        - Version=1
+      hostOnly: true
+    - id: af6a60c8-9cf1-43a3-99cc-9bf83598d70b
+      key: KC_AUTH_STATE
+      value: ""
+      domain: localhost
+      path: /realms/YETZ/
+      secure: false
+      httpOnly: false
+      extensions:
+        - Version=1
+      hostOnly: true
+    - id: 86400df8-d8a6-40a7-ae60-665ad80d6bf4
+      key: XSRF-TOKEN
+      value: eyJpdiI6IjNnblQ2Y3FZc09HbitvS0RyT0xEd1E9PSIsInZhbHVlIjoiM2dtcnRRa0dIT2VreXI3a2hYNGRMUDRWZkNHTmVialQwdTBFZTA2RWVqZjdlOVVVSG8xdGdNQ3YrSjJ2NmUydFF4ajhITVM2b0VKYW5QbXJ0SWF1Q05uQm4wQ0hjN2owa0RUOUZ2TGlYZWNwODlmMkxpYWx4a01YNUx4WThFMFAiLCJtYWMiOiI2ZGZkNmIzOTY0NzZiZGUyZmM3NDlmMTk1ODBhMDJmNjlhODQ4ZDhkNTNiNTIwYjFhNTk5ZmZkYmY2YmFmOTQ2IiwidGFnIjoiIn0%3D
+      domain: localhost
+      path: /
+      secure: false
+      httpOnly: false
+      hostOnly: true
+    - id: 8511314d-6cdb-42ab-a4f4-53f5bb3b6d7d
+      key: laravel-session
+      value: eyJpdiI6IkNVWnVmTWtBYjgxanIveUpsZVNJd2c9PSIsInZhbHVlIjoiVk02NURydjdETC9hc1VvclQ0YS80V2h2TlZHTnhITi9NM0FYTGdlMGdHd2k3N0JLR0NIZVcvd2Z1SUpya3NSS0N1Wm5yOUdmdnliTlVFaHdLcUZ1NTFoaEk1WmU5YzN6L2dtbHZ1aWk0eEN2eEpuUjk3eUl6VlJXdmV2LzNCSEoiLCJtYWMiOiIwMWU5NjMwZmFhZGU3MTcwMjk2ODY0ODI3NzJkNmJjNTgxZmYyMjRjMjJmMGFkNWIxODdmNGYzMDg0NzZjZWExIiwidGFnIjoiIn0%3D
+      domain: localhost
+      path: /
+      secure: false
+      httpOnly: true
+      hostOnly: true
+environments:
+  name: Base Environment
+  meta:
+    id: env_45341eb6502e4df7944afa1dc61f79bb
+    created: 1746369733798
+    modified: 1746369733798
+    isPrivate: false
+  subEnvironments:
+    - name: Localhost
+      meta:
+        id: env_19e4c7c20adc4474a9265e0c1c1e9fd1
+        created: 1746369790909
+        modified: 1785358338046
+        isPrivate: false
+        sortKey: 1746369790909
+      data:
+        base_url_command_api: http://localhost:8001/
+        base_url_query_api: http://localhost:8002/
+      color: "#5eda0b"

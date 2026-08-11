@@ -299,19 +299,19 @@ Decisões de escopo desta trilha:
 
 ---
 
-# [*] Epic 2 — Publicação de Eventos
+# [OK] Epic 2 — Publicação de Eventos
 
-### [*] Card 4 — Definir contratos dos eventos
+### [OK] Card 4 — Definir contratos dos eventos
 **Descrição:** Modelar os principais eventos do domínio de pedidos (ex.: `OrderCreated`, `OrderUpdated`) em `shared/events`, seguindo o envelope padrão documentado na seção Domínio da Plataforma e padronizando estrutura, payload e informações compartilhadas entre produtores e consumidores.
 
 ---
 
-### [*] Card 5 — Criar Producer API
+### [OK] Card 5 — Criar Producer API
 **Descrição:** Desenvolver uma API responsável por receber requisições HTTP, validar os contratos definidos no Card 4, persistir o pedido no PostgreSQL (SQLAlchemy + Alembic) e publicar o evento correspondente na plataforma Kafka.
 
 ---
 
-### [*] Card 6 — Publicar primeiro Event Stream
+### [OK] Card 6 — Publicar primeiro Event Stream
 **Descrição:** Implementar a publicação contínua de eventos de pedidos (ex.: `OrderCreated`) e validar sua chegada aos tópicos utilizando o Kafka UI.
 
 ---
