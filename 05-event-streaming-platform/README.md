@@ -19,7 +19,7 @@ Ao final, a aplicação representará uma plataforma de Event Streaming capaz de
 - **FastAPI** — APIs responsáveis pela publicação contínua de eventos na plataforma.
 - **Apache Kafka (KRaft mode)** — Plataforma de Event Streaming sem dependência de Zookeeper, utilizando o modo KRaft nativo das versões modernas do Kafka.
 - **confluent-kafka** — Biblioteca cliente Python para produção e consumo de eventos no Kafka (wrapper do librdkafka, padrão de mercado).
-- **PostgreSQL** — Um único container com um database dedicado por serviço (ex.: `db_producer`, `db_billing`, `db_analytics`).
+- **PostgreSQL** — Um único container com um database dedicado por serviço (ex.: `db_producer`, `db_notification`, `db_billing`, `db_analytics`).
 - **Docker & Docker Compose** — Orquestração de toda a infraestrutura local.
 - **Kafka UI** — Visualização de Topics, Partitions, Consumer Groups, Offsets e mensagens publicadas.
 
@@ -48,7 +48,7 @@ Para dar contexto real aos conceitos abordados, a plataforma adota o domínio de
 * **Eventos:** ciclo de vida do pedido (ex.: `OrderCreated`, `OrderUpdated`), definidos na camada `shared/events`.
 * **Message Key:** `order_id` — garante que eventos do mesmo pedido sejam gravados em uma única partição, preservando a ordenação.
 * **Topics (sugestão inicial):** `orders.created` (e demais eventos do ciclo), com tópicos `-retry` e `-dlt` correspondentes nas etapas de tratamento de falhas.
-* **Persistência:** um único container PostgreSQL com um database por serviço (ex.: `db_producer`, `db_billing`, `db_analytics`). O producer-api persiste o pedido antes de publicar (SQLAlchemy + Alembic); cada consumidor persiste seus próprios resultados no database correspondente.
+* **Persistência:** um único container PostgreSQL com um database por serviço (ex.: `db_producer`, `db_notification`, `db_billing`, `db_analytics`). O producer-api persiste o pedido antes de publicar (SQLAlchemy + Alembic); cada consumidor persiste seus próprios resultados no database correspondente.
 * **Consumidores ativos:** além de consumir, o inventory-consumer reserva estoque e publica eventos derivados (ex.: `InventoryReserved`), demonstrando que um consumidor também pode ser produtor.
 
 **Envelope padrão dos eventos** (referência de contrato — implementação no Card 4):
@@ -169,7 +169,7 @@ Contém todos os consumidores independentes da plataforma. Cada consumidor possu
 
 ### notification-consumer/
 
-Simula envio de notificações a partir dos eventos de pedidos consumidos, registrando as notificações enviadas.
+Consome eventos do tópico `orders.created` e simula o envio de notificações (e-mail) aos clientes, registrando cada notificação no banco dedicado `db_notification` (SQLAlchemy + Alembic). Implementa **idempotência** via coluna `UNIQUE(event_id)` para evitar notificações duplicadas em cenários de re-entrega (*At-Least-Once delivery*).
 
 ### billing-consumer/
 
@@ -207,7 +207,10 @@ Modelos Pydantic utilizados para serialização e validação.
 
 ### kafka/
 
-Configurações comuns de Producer e Consumer Kafka.
+Wrappers compartilhados de Producer e Consumer Kafka.
+
+- **`producer.py`** — `KafkaProducerWrapper`: encapsula o `confluent-kafka` Producer com callback de entrega e o método `produce_event(event)` para roteamento automático de tópicos baseado no `EventType` (Card 8).
+- **`consumer.py`** — `KafkaConsumerWrapper`: encapsula o `confluent-kafka` Consumer com loop de poll, desserialização JSON e graceful shutdown via `SIGINT`/`SIGTERM` (Card 9).
 
 ### utils/
 
@@ -316,19 +319,19 @@ Decisões de escopo desta trilha:
 
 ---
 
-# [*] Epic 3 — Organização dos Topics
+# [OK] Epic 3 — Organização dos Topics
 
-### [*] Card 7 — Criar Topics por domínio
+### [OK] Card 7 — Criar Topics por domínio
 **Descrição:** Separar eventos em tópicos específicos do domínio de pedidos (ex.: `orders.created`, `orders.updated`), organizando o fluxo e facilitando evolução e manutenção da plataforma.
 
 ---
 
-### [*] Card 8 — Direcionar eventos corretamente
+### [OK] Card 8 — Direcionar eventos corretamente
 **Descrição:** Garantir que cada tipo de evento seja publicado apenas no tópico correspondente ao seu domínio.
 
 ---
 
-### [*] Card 9 — Criar e configurar o primeiro consumidor
+### [OK] Card 9 — Criar e configurar o primeiro consumidor
 **Descrição:** Criar o primeiro consumidor do zero — o notification-consumer — conectando-o ao tópico `orders.created`, processando os eventos recebidos e registrando as notificações enviadas. O padrão criado aqui será replicado para os demais consumidores ao longo da trilha.
 
 ---

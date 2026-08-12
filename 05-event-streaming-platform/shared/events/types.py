@@ -25,6 +25,19 @@ class EventType(str, Enum):
     # Publicado de volta ao Kafka após reserva de estoque (Card 25)
     INVENTORY_RESERVED = "InventoryReserved"
 
+    @property
+    def topic(self) -> str:
+        """Retorna o nome oficial do tópico Kafka associado a este tipo de evento."""
+        return EVENT_TOPIC_MAP[self]
+
+
+# ── Mapeamento Centralizado de Tópicos por EventType (Card 8) ───────────────
+EVENT_TOPIC_MAP: dict[EventType, str] = {
+    EventType.ORDER_CREATED: "orders.created",
+    EventType.ORDER_UPDATED: "orders.updated",
+    EventType.INVENTORY_RESERVED: "inventory.reserved",
+}
+
 
 class OrderStatus(str, Enum):
     """

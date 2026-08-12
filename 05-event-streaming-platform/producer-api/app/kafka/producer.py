@@ -1,16 +1,11 @@
 """
 Producer Kafka do producer-api.
-Define tópicos e instancia o KafkaProducerWrapper com configuração do ambiente.
+Instancia o KafkaProducerWrapper reutilizável com a configuração do ambiente.
 """
 
 import os
 
 from shared.kafka.producer import KafkaProducerWrapper
-
-# ── Tópicos ────────────────────────────────────────────────────────────────
-# Nomes definitivos a serem organizados por domínio no Card 7.
-TOPIC_ORDERS_CREATED = "orders.created"
-TOPIC_ORDERS_UPDATED = "orders.updated"
 
 # ── Instância singleton ────────────────────────────────────────────────────
 _BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")

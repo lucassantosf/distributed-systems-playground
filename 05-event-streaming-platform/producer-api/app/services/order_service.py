@@ -3,7 +3,7 @@ Serviço de pedidos — lógica de negócio do producer-api.
 
 Responsável por:
   1. Persistir o pedido no PostgreSQL (db_producer)
-  2. Publicar o evento correspondente no Kafka
+  2. Publicar o evento correspondente no Kafka via roteamento automático (Card 8)
   3. Retornar o resultado para a camada de API
 
 Fluxo: HTTP request → order_service → PostgreSQL + Kafka → response
@@ -15,11 +15,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.kafka.producer import (
-    KafkaProducerWrapper,
-    TOPIC_ORDERS_CREATED,
-    TOPIC_ORDERS_UPDATED,
-)
+from app.kafka.producer import KafkaProducerWrapper
 from app.models.order import Order, OrderItem
 from shared.schemas.order import (
     OrderCreatedPayload,
@@ -43,7 +39,7 @@ def create_order(
     producer: KafkaProducerWrapper,
 ) -> tuple[Order, bool]:
     """
-    Cria um pedido no banco e publica o evento OrderCreated no Kafka.
+    Cria um pedido no banco e publica o evento OrderCreated no Kafka via roteamento tipado.
 
     Returns:
         (order, event_published) — event_published=False se o Kafka falhar,
@@ -82,7 +78,7 @@ def create_order(
     db.refresh(order)
     logger.info(f"Pedido persistido | order_id={order_id}")
 
-    # ── 3. Publicar evento no Kafka ───────────────────────────────────────
+    # ── 3. Publicar evento no Kafka com roteamento automático (Card 8) ─────
     event_published = False
     try:
         payload = OrderCreatedPayload(
@@ -102,14 +98,10 @@ def create_order(
             status="pending",
         )
         event = create_order_created_event(order_id=order_id, payload=payload)
-        producer.produce(
-            topic=TOPIC_ORDERS_CREATED,
-            key=event.to_kafka_key(),
-            value=event.to_kafka_value(),
-        )
+        producer.produce_event(event)
         producer.flush()
         event_published = True
-        logger.info(f"Evento OrderCreated publicado | order_id={order_id} topic={TOPIC_ORDERS_CREATED}")
+        logger.info(f"Evento OrderCreated publicado | order_id={order_id} topic={event.event_type.topic}")
     except Exception as exc:
         logger.error(f"Falha ao publicar evento no Kafka | order_id={order_id} erro={exc}")
 
@@ -124,7 +116,7 @@ def update_order_status(
     producer: KafkaProducerWrapper,
 ) -> tuple[Order | None, bool]:
     """
-    Atualiza o status de um pedido e publica o evento OrderUpdated no Kafka.
+    Atualiza o status de um pedido e publica o evento OrderUpdated no Kafka via roteamento tipado.
 
     Returns:
         (order, event_published) — order=None se o pedido não for encontrado.
@@ -147,14 +139,10 @@ def update_order_status(
             reason=reason,
         )
         event = create_order_updated_event(order_id=order_id, payload=payload)
-        producer.produce(
-            topic=TOPIC_ORDERS_UPDATED,
-            key=event.to_kafka_key(),
-            value=event.to_kafka_value(),
-        )
+        producer.produce_event(event)
         producer.flush()
         event_published = True
-        logger.info(f"Evento OrderUpdated publicado | order_id={order_id} topic={TOPIC_ORDERS_UPDATED}")
+        logger.info(f"Evento OrderUpdated publicado | order_id={order_id} topic={event.event_type.topic}")
     except Exception as exc:
         logger.error(f"Falha ao publicar evento no Kafka | order_id={order_id} erro={exc}")
 

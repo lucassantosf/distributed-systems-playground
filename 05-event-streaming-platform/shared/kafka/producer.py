@@ -38,6 +38,24 @@ class KafkaProducerWrapper:
         # poll(0) processa callbacks pendentes sem bloquear
         self._producer.poll(0)
 
+    def produce_event(self, event) -> None:
+        """
+        Publica um evento derivado do BaseEvent com roteamento automático (Card 8).
+
+        Determina o tópico de destino baseado em `event.event_type.topic`,
+        extrai a Message Key (`event.to_kafka_key()`) e o payload (`event.to_kafka_value()`).
+
+        Args:
+            event: Instância de evento (ex.: OrderCreatedEvent, OrderUpdatedEvent).
+        """
+        topic = event.event_type.topic
+        self.produce(
+            topic=topic,
+            key=event.to_kafka_key(),
+            value=event.to_kafka_value(),
+        )
+
+
     def flush(self, timeout: float = 10.0) -> None:
         """Aguarda a entrega de todas as mensagens pendentes."""
         self._producer.flush(timeout)
