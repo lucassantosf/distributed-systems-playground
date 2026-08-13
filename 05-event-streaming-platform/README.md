@@ -242,15 +242,31 @@ Scripts auxiliares para desenvolvimento e testes da plataforma.
 
 ### create-topics.sh
 
-Criação automática dos tópicos Kafka utilizados no projeto.
+Criação explícita dos tópicos Kafka com 3 partições cada. Deve ser executado após `docker compose up` (Card 7).
+
+### describe-topics.sh
+
+Inspeciona todos os tópicos ativos, exibindo número de partições, líder de cada partição, réplicas e ISR (*In-Sync Replicas*). Ferramenta de observabilidade criada no Card 10.
+
+### watch-consumer-groups.sh
+
+Monitora em tempo real todos os Consumer Groups ativos, mostrando qual partição cada consumidor está lendo, o offset atual, o offset final e o lag (mensagens pendentes). Suporta modo contínuo com `--watch`. Criado no Card 10.
 
 ### produce-sample-events.py
 
-Geração de eventos fictícios para testes de carga e streaming.
+Geração de pedidos fictícios em volume para testes de carga e observação da distribuição de mensagens nas partições. Suporta `--count` e `--delay`. Criado no Card 10.
+
+### verify-message-keys.py
+
+Valida que todos os eventos do mesmo pedido (`order_id`), independente do tipo (`OrderCreated`, `OrderUpdated`), caem consistentemente na mesma partição do Kafka (Card 11).
+
+### verify-partition-distribution.py
+
+Gera relatórios estatísticos de amostragem demonstrando a distribuição uniforme do particionador Kafka (MurmurHash2) entre as 3 partições do tópico, garantindo a ausência de *Hot Partitions* (Card 12).
 
 ### reset-consumer-offsets.sh
 
-Reinicialização dos offsets para testes de replay.
+Reiniçalização dos offsets para testes de replay.
 
 ---
 
@@ -336,19 +352,19 @@ Decisões de escopo desta trilha:
 
 ---
 
-# [*] Epic 4 — Partitions
+# [OK] Epic 4 — Partitions
 
-### [*] Card 10 — Configurar Partitions
+### [OK] Card 10 — Configurar Partitions
 **Descrição:** Dividir os tópicos em múltiplas partições (ex.: 3 por tópico) para permitir paralelismo e maior capacidade de processamento.
 
 ---
 
-### [*] Card 11 — Implementar Message Keys
+### [OK] Card 11 — Implementar Message Keys
 **Descrição:** Utilizar `order_id` como Message Key, garantindo que todos os eventos de um mesmo pedido sejam gravados em uma única partição, preservando a ordenação.
 
 ---
 
-### [*] Card 12 — Validar distribuição das mensagens
+### [OK] Card 12 — Validar distribuição das mensagens
 **Descrição:** Acompanhar como o Kafka distribui automaticamente os eventos entre diferentes partições.
 
 ---
