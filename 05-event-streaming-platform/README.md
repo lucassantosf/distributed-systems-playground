@@ -264,6 +264,18 @@ Valida que todos os eventos do mesmo pedido (`order_id`), independente do tipo (
 
 Gera relatórios estatísticos de amostragem demonstrando a distribuição uniforme do particionador Kafka (MurmurHash2) entre as 3 partições do tópico, garantindo a ausência de *Hot Partitions* (Card 12).
 
+### verify-consumer-groups.py
+
+Valida o padrão Publish-Subscribe (Fan-Out) provando que múltiplos Consumer Groups desacoplados (`notification-group` e `inventory-group`) recebem e processam os mesmos eventos de forma independente (Card 13).
+
+### verify-consumer-scaling.py
+
+Demonstra a escalabilidade horizontal de um mesmo Consumer Group (Competing Consumers) alocando 1 partição por instância e dividindo a carga de trabalho em paralelo entre as 3 réplicas (Card 14).
+
+### verify-consumer-rebalance.py
+
+Testa as 4 fases do ciclo de rebalanceamento dinâmico do Kafka: Scale Up (1 → 3), Over-scaling (3 → 4 com réplica Idle) e Failover com reatribuição automática de partições em caso de queda de container (Card 15).
+
 ### reset-consumer-offsets.sh
 
 Reiniçalização dos offsets para testes de replay.
@@ -369,19 +381,19 @@ Decisões de escopo desta trilha:
 
 ---
 
-# [*] Epic 5 — Consumer Groups
+# [OK] Epic 5 — Consumer Groups
 
-### [*] Card 13 — Criar Consumer Groups
+### [OK] Card 13 — Criar Consumer Groups
 **Descrição:** Organizar consumidores em grupos independentes para compartilhar processamento sem duplicar o consumo dos eventos.
 
 ---
 
-### [*] Card 14 — Escalar consumidores horizontalmente
+### [OK] Card 14 — Escalar consumidores horizontalmente
 **Descrição:** Executar múltiplas instâncias do mesmo consumidor para dividir automaticamente a carga de processamento.
 
 ---
 
-### [*] Card 15 — Validar Rebalanceamento
+### [OK] Card 15 — Validar Rebalanceamento
 **Descrição:** Observar como o Kafka redistribui partições quando consumidores entram ou deixam um Consumer Group.
 
 ---

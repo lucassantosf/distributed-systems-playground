@@ -115,15 +115,36 @@ services:
 
   # ---------------------------------------------------------------------------
   # Notification Consumer — Consome orders.created e envia e-mails (Card 9)
+  # Consumer Group: notification-group
   # ---------------------------------------------------------------------------
   notification-consumer:
     build:
       context: ./consumers/notification-consumer
       dockerfile: Dockerfile
-    container_name: notification-consumer
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/db_notification
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./shared:/app/shared   # shared/ montado como volume
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  # ---------------------------------------------------------------------------
+  # Inventory Consumer — Consome orders.created e reserva estoque (Card 13)
+  # Consumer Group: inventory-group (Grupo independente — Padrão Fan-Out)
+  # ---------------------------------------------------------------------------
+  inventory-consumer:
+    build:
+      context: ./consumers/inventory-consumer
+      dockerfile: Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/db_inventory
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./shared:/app/shared   # shared/ montado como volume

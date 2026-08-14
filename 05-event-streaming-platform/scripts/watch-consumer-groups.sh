@@ -53,9 +53,10 @@ run_once() {
       printf "│  (sem partições atribuídas — consumidor pode estar offline)\n"
     else
       while IFS= read -r line; do
-        read -r grp topic partition current_offset log_end_offset lag rest <<< "$line"
-        printf "│  %-22s | Partition: %-3s | Offset: %-8s | LogEnd: %-8s | Lag: %-5s\n" \
-          "$topic" "$partition" "$current_offset" "$log_end_offset" "$lag"
+        read -r grp topic partition current_offset log_end_offset lag consumer_id host client_id rest <<< "$line"
+        cid="${consumer_id:-unassigned}"
+        printf "│  %-20s | Partition: %-2s | Offset: %-6s | LogEnd: %-6s | Lag: %-4s | Consumer: %-35s\n" \
+          "$topic" "$partition" "$current_offset" "$log_end_offset" "$lag" "${cid:0:35}"
       done < "$GROUPFILE"
     fi
     rm -f "$GROUPFILE"
