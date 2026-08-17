@@ -276,9 +276,21 @@ Demonstra a escalabilidade horizontal de um mesmo Consumer Group (Competing Cons
 
 Testa as 4 fases do ciclo de rebalanceamento dinâmico do Kafka: Scale Up (1 → 3), Over-scaling (3 → 4 com réplica Idle) e Failover com reatribuição automática de partições em caso de queda de container (Card 15).
 
+### verify-offsets-behavior.py
+
+Gera tabelas de inspeção de offsets por partição mostrando Earliest, Log-End-Offset, Committed Offset e Lag por Consumer Group antes e depois da produção de novos eventos (Card 16).
+
+### verify-consumer-restart.py
+
+Valida a preservação automática de offsets após paradas temporárias (Resume) e testa o reset manual de offsets para `--to-earliest` com proteção por idempotência no banco de dados (Card 17).
+
+### verify-event-replay.py
+
+Demonstra o Replay de Eventos históricos por janela de tempo (`--to-datetime`), recuando o ponteiro de offset do grupo para um timestamp específico e reprocessando o fluxo sem duplicação de dados no banco (Card 18).
+
 ### reset-consumer-offsets.sh
 
-Reiniçalização dos offsets para testes de replay.
+Utilitário CLI para redefinição manual de offsets de Consumer Groups para estratégias de replay (`--to-earliest`, `--to-latest`, etc.).
 
 ---
 
@@ -398,19 +410,19 @@ Decisões de escopo desta trilha:
 
 ---
 
-# [*] Epic 6 — Offsets e Replay
+# [OK] Epic 6 — Offsets e Replay
 
-### [*] Card 16 — Explorar funcionamento dos Offsets
+### [OK] Card 16 — Explorar funcionamento dos Offsets
 **Descrição:** Entender como cada consumidor controla individualmente sua posição de leitura dentro de um tópico.
 
 ---
 
-### [*] Card 17 — Reiniciar consumidores
+### [OK] Card 17 — Reiniciar consumidores
 **Descrição:** Reiniciar consumidores preservando ou redefinindo offsets para compreender diferentes estratégias de processamento.
 
 ---
 
-### [*] Card 18 — Realizar Replay de eventos
+### [OK] Card 18 — Realizar Replay de eventos
 **Descrição:** Reprocessar eventos históricos utilizando offsets anteriores sem necessidade de republicar novas mensagens. O replay é limitado pela janela de retenção configurada no Card 19.
 
 ---
