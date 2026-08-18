@@ -37,6 +37,8 @@ def create_order(
     items_data: list[dict],
     currency: str,
     producer: KafkaProducerWrapper,
+    simulate_error: str | None = None,
+    fail_until_retry: int = 1,
 ) -> tuple[Order, bool]:
     """
     Cria um pedido no banco e publica o evento OrderCreated no Kafka via roteamento tipado.
@@ -96,6 +98,8 @@ def create_order(
             total_amount=total_amount,
             currency=currency,
             status="pending",
+            simulate_error=simulate_error,
+            fail_until_retry=fail_until_retry,
         )
         event = create_order_created_event(order_id=order_id, payload=payload)
         producer.produce_event(event)

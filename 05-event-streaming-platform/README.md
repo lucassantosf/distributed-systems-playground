@@ -288,6 +288,30 @@ Valida a preservação automática de offsets após paradas temporárias (Resume
 
 Demonstra o Replay de Eventos históricos por janela de tempo (`--to-datetime`), recuando o ponteiro de offset do grupo para um timestamp específico e reprocessando o fluxo sem duplicação de dados no banco (Card 18).
 
+### verify-retention-policy.py
+
+Inspeciona, altera dinamicamente e restaura as políticas de Retention de um tópico Kafka (`retention.ms` e `retention.bytes`), comprovando a expiração de mensagens e o avanço do Earliest Offset sem reiniciar o cluster (Card 19).
+
+### verify-late-consumer.py
+
+Demonstra o padrão de Consumidores Tardios do Event Streaming: um novo grupo de consumo iniciado tardiamente acessa e reprocessa o histórico completo do tópico desde o Earliest Offset, sem necessidade de re-publicação (Card 20).
+
+### verify-event-streaming.py
+
+Validação abrangente da plataforma de Event Streaming comprovando os 3 pilares: Durabilidade do Log (eventos persistem após o consumo), Fan-Out Multi-Consumer (grupos independentes com offsets isolados) e Acessibilidade Tardia (late consumers lendo o histórico dentro da janela de Retention) (Card 21).
+
+### verify-retry-mechanism.py
+
+Demonstra a estratégia de resiliência com Retry Topic (`orders.created-retry`) e Backoff Progressivo. Captura falhas temporárias no tópico principal, redireciona o evento com metadata de tentativa e executa o reprocessamento com sucesso sem travar a partição principal (Card 22).
+
+### verify-dlt-mechanism.py
+
+Valida o isolamento de mensagens com Dead Letter Topic (`orders.created-dlt`). Comprova a rota Fast-Fail para erros fatais e o encaminhamento automático de eventos que excedem o limite máximo de retentativas (`MAX_RETRIES=3`) mantendo a auditoria completa de erros no payload (Card 23).
+
+### verify-fault-recovery.py
+
+Comprova a garantia de Isolamento de Falhas e Resiliência da arquitetura de Event Streaming: demonstra que falhas e exceções em um consumidor não afetam a disponibilidade da API produtora nem interrompem outros consumidores paralelos (Card 24).
+
 ### reset-consumer-offsets.sh
 
 Utilitário CLI para redefinição manual de offsets de Consumer Groups para estratégias de replay (`--to-earliest`, `--to-latest`, etc.).
@@ -427,36 +451,36 @@ Decisões de escopo desta trilha:
 
 ---
 
-# [*] Epic 7 — Retention
+# [OK] Epic 7 — Retention
 
-### [*] Card 19 — Configurar políticas de Retention
+### [OK] Card 19 — Configurar políticas de Retention
 **Descrição:** Definir quanto tempo os eventos permanecerão armazenados antes de serem removidos automaticamente. Essa janela delimita até onde é possível realizar Replay (Card 18).
 
 ---
 
-### [*] Card 20 — Criar consumidores tardios
+### [OK] Card 20 — Criar consumidores tardios
 **Descrição:** Demonstrar que novos consumidores conseguem processar eventos publicados antes da sua inicialização. Exemplo mental: eventos de pedidos são publicados desde as 09:00; ao iniciar o analytics às 10:00, ele lê o histórico completo a partir das 09:00 — não apenas o que chegar a partir daí.
 
 ---
 
-### [*] Card 21 — Validar Event Streaming
+### [OK] Card 21 — Validar Event Streaming
 **Descrição:** Comprovar que eventos permanecem disponíveis durante o período de retenção para diferentes consumidores.
 
 ---
 
-# [*] Epic 8 — Tratamento de Falhas
+# [OK] Epic 8 — Tratamento de Falhas
 
-### [*] Card 22 — Implementar Retry
+### [OK] Card 22 — Implementar Retry
 **Descrição:** Reprocessar automaticamente eventos que apresentarem falhas temporárias durante sua execução, utilizando **retry topics com consumidor separado e backoff** (ex.: `orders.created-retry`). Ao falhar, o consumidor principal publica a mensagem no tópico `-retry`; um segundo consumidor dedicado processa esse tópico com delay progressivo antes de encaminhar ao DLT caso as tentativas se esgotem.
 
 ---
 
-### [*] Card 23 — Criar Dead Letter Topic
+### [OK] Card 23 — Criar Dead Letter Topic
 **Descrição:** Encaminhar eventos inválidos ou que esgotarem as tentativas de retry para um tópico DLT dedicado (ex.: `orders.created-dlt`), sem interromper o fluxo principal da plataforma.
 
 ---
 
-### [*] Card 24 — Validar recuperação de falhas
+### [OK] Card 24 — Validar recuperação de falhas
 **Descrição:** Garantir que falhas isoladas não afetem os demais consumidores nem interrompam o Event Stream.
 
 ---

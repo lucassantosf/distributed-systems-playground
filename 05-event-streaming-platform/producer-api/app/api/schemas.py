@@ -23,6 +23,8 @@ class CreateOrderRequest(BaseModel):
     customer_email: str = Field(..., description="E-mail do cliente")
     items: list[OrderItemRequest] = Field(..., min_length=1, description="Itens do pedido")
     currency: str = Field(default="BRL", description="Moeda")
+    simulate_error: str | None = Field(default=None, description="Simulação de erro para testes (temporary/fatal)")
+    fail_until_retry: int = Field(default=1, description="Tentativa até a qual falhar")
 
 
 class UpdateOrderStatusRequest(BaseModel):

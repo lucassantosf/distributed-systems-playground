@@ -38,6 +38,11 @@ EVENT_TOPIC_MAP: dict[EventType, str] = {
     EventType.INVENTORY_RESERVED: "inventory.reserved",
 }
 
+# ── Tópicos de Resiliência (Retry e Dead Letter Topics - Cards 22 & 23) ──────
+TOPIC_ORDERS_CREATED_RETRY = "orders.created-retry"
+TOPIC_ORDERS_CREATED_DLT = "orders.created-dlt"
+
+
 
 class OrderStatus(str, Enum):
     """

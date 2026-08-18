@@ -48,6 +48,8 @@ def create_order(
         items_data=items_data,
         currency=body.currency,
         producer=producer,
+        simulate_error=body.simulate_error,
+        fail_until_retry=body.fail_until_retry,
     )
 
     return OrderResponse(

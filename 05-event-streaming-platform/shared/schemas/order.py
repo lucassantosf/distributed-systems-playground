@@ -35,6 +35,8 @@ class OrderCreatedPayload(BaseModel):
     total_amount: Decimal = Field(..., gt=0, description="Valor total do pedido em BRL")
     currency: str = Field(default="BRL", description="Moeda do pedido")
     status: str = Field(default="pending", description="Status inicial do pedido")
+    simulate_error: str | None = Field(default=None, description="Simulação de erro para testes (temporary/fatal)")
+    fail_until_retry: int = Field(default=1, description="Número da tentativa até a qual falhar")
 
 
 class OrderUpdatedPayload(BaseModel):
