@@ -1,12 +1,15 @@
 """
 Modelo SQLAlchemy para a tabela inventory_reservations no db_inventory.
-Garante controle de estoque e idempotência (UNIQUE em event_id).
+Garante controle de estoque e idempotência via UNIQUE(event_id, product_id).
+
+A idempotência é garantida pelo par (event_id, product_id): o mesmo evento
+Kafka pode ter múltiplos produtos, mas nunca reservar o mesmo produto duas vezes.
 """
 
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -16,13 +19,16 @@ class Base(DeclarativeBase):
 
 class InventoryReservation(Base):
     __tablename__ = "inventory_reservations"
+    __table_args__ = (
+        # Idempotência real: o mesmo evento Kafka nunca reserva o mesmo produto duas vezes.
+        UniqueConstraint("event_id", "product_id", name="uq_inventory_reservations_event_product"),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
     order_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
-    # event_id com unique=True é a chave para a IDEMPOTÊNCIA no consumidor
-    event_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True, index=True)
+    event_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     product_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     product_name: Mapped[str] = mapped_column(String(255), nullable=False)
     quantity_reserved: Mapped[int] = mapped_column(Integer, nullable=False)

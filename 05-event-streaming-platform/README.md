@@ -312,6 +312,22 @@ Valida o isolamento de mensagens com Dead Letter Topic (`orders.created-dlt`). C
 
 Comprova a garantia de Isolamento de Falhas e Resiliência da arquitetura de Event Streaming: demonstra que falhas e exceções em um consumidor não afetam a disponibilidade da API produtora nem interrompem outros consumidores paralelos (Card 24).
 
+### verify-consumer-producer-pattern.py
+
+Valida o padrão Consumidor-que-também-é-Produtor: comprova que o `inventory-consumer` reserva estoque e publica o evento derivado `InventoryReserved` no tópico `inventory.reserved`, herdando o `correlation_id` do `OrderCreated` para rastreabilidade completa da cadeia de eventos (Card 25).
+
+### verify-architectural-decoupling.py
+
+Valida o desacoplamento arquitetural em 4 fases: auditoria de código (zero referências a consumidores no producer-api), entrada de novo grupo sem alterar o produtor, cadeia derivada também livre para qualquer consumidor, e mapa completo de grupos isolados no Kafka (Card 26).
+
+### verify-high-volume.py
+
+Stress test parametrizável (`--total N --workers N`) que publica centenas de pedidos com concorrência e mede throughput (eventos/s), latência média e P99, tempo de recuperação do lag nos consumer groups e taxa de sucesso end-to-end (Card 28).
+
+### verify-full-flow.py
+
+Validação master End-to-End (E2E) da plataforma: executa sequencialmente a publicação via Producer API, fan-out multi-consumer, emissão de evento derivado (`InventoryReserved`), resiliência com Retry Topic e Backoff, isolamento no Dead Letter Topic (DLT) e replay com proteção por Idempotência (Card 29).
+
 ### reset-consumer-offsets.sh
 
 Utilitário CLI para redefinição manual de offsets de Consumer Groups para estratégias de replay (`--to-earliest`, `--to-latest`, etc.).
@@ -487,32 +503,32 @@ Decisões de escopo desta trilha:
 
 # [*] Epic 9 — Plataforma Distribuída
 
-### [*] Card 25 — Adicionar novos consumidores
+### [OK] Card 25 — Adicionar novos consumidores
 **Descrição:** Integrar novos serviços independentes (ex.: inventory-consumer, que reserva estoque) utilizando apenas os eventos existentes, sem alterar os produtores. O inventory-consumer também serve de exemplo de consumidor ativo, publicando eventos derivados de volta ao Kafka.
 
 ---
 
-### [*] Card 26 — Validar desacoplamento arquitetural
+### [OK] Card 26 — Validar desacoplamento arquitetural
 **Descrição:** Demonstrar que produtores desconhecem completamente quem consome seus eventos e como serão processados.
 
 ---
 
-### [*] Card 27 — Monitorar a plataforma
-**Descrição:** Utilizar Kafka UI para acompanhar tópicos, partições, offsets, lag e comportamento dos consumidores.
+### [OK] Card 27 — Monitorar a plataforma
+**Descrição:** Utilizar Kafka UI para acompanhar tópicos, partições, offsets, lag e comportamento dos consumidores. ✅ Implementado via `kafka-ui` (porta `8080`) desde a infraestrutura inicial (Card 2). Monitoramento programático complementar disponível via scripts `verify-offsets-behavior.py` e `verify-event-streaming.py`.
 
 ---
 
-# [*] Epic 10 — Consolidação
+# [OK] Epic 10 — Consolidação
 
-### [*] Card 28 — Simular alto volume de eventos
+### [OK] Card 28 — Simular alto volume de eventos
 **Descrição:** Publicar continuamente centenas de eventos para observar escalabilidade e comportamento da plataforma.
 
 ---
 
-### [*] Card 29 — Executar fluxo completo
+### [OK] Card 29 — Executar fluxo completo
 **Descrição:** Validar publicação, distribuição, processamento, replay e recuperação de falhas em um cenário integrado.
 
 ---
 
-### [*] Card 30 — Consolidar arquitetura de Event Streaming
-**Descrição:** Revisar todos os conceitos implementados e validar o funcionamento completo da plataforma baseada em Apache Kafka.
+### [OK] Card 30 — Consolidar arquitetura de Event Streaming
+**Descrição:** Revisar todos os conceitos implementados e validar o funcionamento completo da plataforma baseada em Apache Kafka. ✅ Plataforma 100% consolidada com os 30 cards e 10 épicos finalizados com sucesso!
