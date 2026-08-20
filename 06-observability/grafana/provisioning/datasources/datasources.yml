@@ -1,0 +1,12 @@
+# =============================================================================
+# Grafana — Data Sources (Provisioning)
+# Preenchido no Card 5
+# =============================================================================
+
+apiVersion: 1
+
+datasources:
+  # Card 5: Thanos Querier como fonte de métricas
+  # Card 5: OpenSearch como fonte de logs
+  # Card 5: Tempo como fonte de traces
+  []

@@ -1,0 +1,8 @@
+# =============================================================================
+# Thanos — Configuração do Sidecar / Store / Querier / Compactor
+# Preenchido no Card 2 (Sidecar/Querier) e Card 15 (Compactor)
+# =============================================================================
+
+# Placeholder — o Thanos é configurado majoritariamente via flags de CLI
+# no docker-compose.yml. Este arquivo pode ser usado para configurações
+# adicionais como object storage (S3/GCS) em ambientes reais.

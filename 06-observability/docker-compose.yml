@@ -1,0 +1,179 @@
+
+# =============================================================================
+# Observability Platform — docker-compose.yml
+#
+# Os serviços serão adicionados card a card:
+#   Card 2  → Prometheus + Thanos (metrics/)
+#   Card 3  → Filebeat + Logstash + OpenSearch (logs/)
+#   Card 4  → OTel Collector + Tempo (traces/)
+#   Card 5  → Grafana (grafana/)
+#   Card 6  → sample-app (apps/sample-app/)
+# =============================================================================
+
+networks:
+  observability_network:
+    name: observability_network
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  thanos_data:
+  tempo_data:
+  opensearch_data:
+  grafana_data:
+  logs_data:
+
+services:
+
+  # ============================================================
+  # Card 2 — Métricas: Prometheus + Thanos
+  # ============================================================
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}"
+      # Blocos de 2h para que o Thanos Sidecar consiga lê-los
+      - "--storage.tsdb.min-block-duration=2h"
+      - "--storage.tsdb.max-block-duration=2h"
+      - "--web.enable-lifecycle"
+      - "--web.enable-remote-write-receiver"
+    volumes:
+      - ./metrics/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./metrics/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability_network
+
+  thanos-sidecar:
+    image: quay.io/thanos/thanos:v0.35.1
+    container_name: thanos-sidecar
+    restart: unless-stopped
+    command:
+      - "sidecar"
+      - "--tsdb.path=/prometheus"
+      - "--prometheus.url=http://prometheus:9090"
+      - "--grpc-address=0.0.0.0:10901"
+      - "--http-address=0.0.0.0:10902"
+    volumes:
+      - prometheus_data:/prometheus:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      - observability_network
+
+  thanos-store:
+    image: quay.io/thanos/thanos:v0.35.1
+    container_name: thanos-store
+    restart: unless-stopped
+    command:
+      - "store"
+      - "--grpc-address=0.0.0.0:10901"
+      - "--http-address=0.0.0.0:10902"
+      - "--data-dir=/thanos/store"
+      # Em ambiente local sem object storage usamos o volume direto
+      - "--objstore.config={type: FILESYSTEM, config: {directory: /thanos/store}}"
+    user: root
+    volumes:
+      - thanos_data:/thanos/store
+    depends_on:
+      - thanos-sidecar
+    networks:
+      - observability_network
+
+  thanos-querier:
+    image: quay.io/thanos/thanos:v0.35.1
+    container_name: thanos-querier
+    restart: unless-stopped
+    command:
+      - "query"
+      - "--grpc-address=0.0.0.0:10901"
+      - "--http-address=0.0.0.0:10902"
+      # Agrega dados do Sidecar (dados recentes) e do Store (dados antigos)
+      - "--store=thanos-sidecar:10901"
+      - "--store=thanos-store:10901"
+      - "--query.replica-label=prometheus_replica"
+    ports:
+      - "10902:10902"
+    depends_on:
+      - thanos-sidecar
+      - thanos-store
+    networks:
+      - observability_network
+
+  # ============================================================
+  # Card 3 — Logs: OpenSearch + Logstash + Filebeat
+  # ============================================================
+
+  opensearch:
+    image: opensearchproject/opensearch:2.14.0
+    container_name: opensearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      # Desabilita autenticação/TLS para ambiente de desenvolvimento
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - observability_network
+
+  logstash:
+    image: opensearchproject/logstash-oss-with-opensearch-output-plugin:8.9.0
+    container_name: logstash
+    restart: unless-stopped
+    environment:
+      - LS_JAVA_OPTS=${LS_JAVA_OPTS:--Xms256m -Xmx256m}
+    volumes:
+      - ./logs/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - logs_data:/logs
+    ports:
+      - "5044:5044"   # Beats input (Filebeat → Logstash)
+      - "9600:9600"   # Logstash HTTP API (monitoramento)
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'cat < /dev/null > /dev/tcp/localhost/5044'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - observability_network
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: filebeat
+    restart: unless-stopped
+    user: root
+    command: filebeat -e -strict.perms=false
+    volumes:
+      - ./logs/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - logs_data:/logs:ro
+    depends_on:
+      logstash:
+        condition: service_healthy
+    networks:
+      - observability_network
+

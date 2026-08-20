@@ -1,0 +1,20 @@
+# =============================================================================
+# Alertmanager — Configuração de Receivers e Rotas
+# Preenchido no Card 14
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'default'
+
+receivers:
+  - name: 'default'
+    # Card 14: configurar receiver (webhook, Slack, etc.)
+
+inhibit_rules: []

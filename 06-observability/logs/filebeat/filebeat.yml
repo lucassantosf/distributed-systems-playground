@@ -1,0 +1,25 @@
+# =============================================================================
+# Filebeat — Coleta de Logs → Logstash
+# Card 3: pipeline base
+# Card 9: logs JSON estruturados com trace_id/span_id gerados pela sample-app
+# =============================================================================
+
+filebeat.inputs:
+  - type: log
+    enabled: true
+    # Monitora todos os arquivos .log dentro do diretório compartilhado
+    paths:
+      - /logs/*.log
+    # Aguarda 5s sem atividade para fechar o file handle
+    close_inactive: 5s
+    # Campos adicionados a todos os eventos
+    fields:
+      env: development
+    fields_under_root: true
+
+# Envia os eventos para o Logstash (não diretamente ao OpenSearch)
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info
+logging.to_files: false

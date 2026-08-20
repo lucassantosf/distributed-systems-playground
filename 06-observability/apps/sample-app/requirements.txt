@@ -1,0 +1,20 @@
+# =============================================================================
+# sample-app — Dependências Python
+# Preenchido no Card 6 (FastAPI base) e expandido nos Cards 7, 8 e 9
+# =============================================================================
+
+# Card 6 — Aplicação base
+fastapi
+uvicorn[standard]
+
+# Card 7 — Métricas Prometheus
+# prometheus-client
+
+# Card 8 — Traces OpenTelemetry
+# opentelemetry-sdk
+# opentelemetry-api
+# opentelemetry-instrumentation-fastapi
+# opentelemetry-exporter-otlp-proto-grpc
+
+# Card 9 — Logs estruturados
+# python-json-logger

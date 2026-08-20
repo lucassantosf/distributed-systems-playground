@@ -1,0 +1,33 @@
+# =============================================================================
+# Prometheus — Configuração de Scraping
+# Card 2: self-scraping configurado
+# Card 7: sample-app adicionada
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  # Obrigatório pelo Thanos Sidecar: identifica unicamente esta réplica
+  external_labels:
+    cluster: local
+    replica: prometheus-0
+
+# Regras de alerta (Card 14)
+rule_files:
+  - "alert-rules.yml"
+
+scrape_configs:
+
+  # ------------------------------------------------------------------
+  # Card 2 — Self-scraping do Prometheus
+  # ------------------------------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ------------------------------------------------------------------
+  # Card 7 — sample-app (adicionado no Card 7)
+  # ------------------------------------------------------------------
+  # - job_name: "sample-app"
+  #   static_configs:
+  #     - targets: ["sample-app:8000"]
