@@ -1,7 +1,11 @@
 # =============================================================================
 # OpenTelemetry Collector — Receivers, Processors, Exporters
-# Preenchido no Card 4
+# Card 4: Infraestrutura de Traces
 # =============================================================================
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
 
 receivers:
   otlp:
@@ -15,13 +19,13 @@ processors:
   batch:
 
 exporters:
-  # Card 4: exportar traces para o Grafana Tempo
   otlp/tempo:
-    endpoint: ""
+    endpoint: "tempo:4317"
     tls:
       insecure: true
 
 service:
+  extensions: [health_check]
   pipelines:
     traces:
       receivers: [otlp]

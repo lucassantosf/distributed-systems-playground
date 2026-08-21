@@ -203,7 +203,7 @@ docker compose up -d
 
 ---
 
-### [*] Card 4 — Subir infraestrutura de Traces (OTel Collector + Tempo)
+### [OK] Card 4 — Subir infraestrutura de Traces (OTel Collector + Tempo)
 **Descrição:** Configurar e subir os serviços de traces no Docker Compose. O **Grafana Tempo** deve ser configurado com um `tempo.yaml` básico, habilitando o receiver OTLP (gRPC e HTTP) e persistindo dados em Docker Volume. O **OpenTelemetry Collector** deve ser configurado com um `otel-collector-config.yaml` definindo: `receivers` (OTLP gRPC e HTTP), `processors` (batch), `exporters` (Tempo via OTLP gRPC) e o `service pipeline` conectando tudo. Ao final, enviar um trace de teste via `curl` ou script para o OTel Collector e validar que ele aparece no Tempo via API REST (`/api/traces`).
 
 ---
