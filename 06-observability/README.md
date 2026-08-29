@@ -208,19 +208,19 @@ docker compose up -d
 
 ---
 
-### [*] Card 5 — Subir e configurar o Grafana
+### [OK] Card 5 — Subir e configurar o Grafana
 **Descrição:** Adicionar o Grafana ao Docker Compose e configurar as três fontes de dados via provisioning automático (arquivo YAML em `grafana/provisioning/datasources/`), sem precisar configurar manualmente pela UI: **Thanos Querier** como fonte de métricas, **OpenSearch** como fonte de logs (plugin `grafana-opensearch-datasource`) e **Tempo** como fonte de traces. Ao final, acessar o Grafana em `localhost:3000` e confirmar que as três fontes de dados estão configuradas com status `OK` na página de Data Sources.
 
 ---
 
 # [*] Epic 2 — Aplicação de Exemplo Instrumentada
 
-### [*] Card 6 — Criar aplicação de exemplo
+### [OK] Card 6 — Criar aplicação de exemplo
 **Descrição:** Criar uma pequena aplicação em **Python (FastAPI)** dentro do diretório `apps/sample-app/` que será a cobaia da plataforma. Ela deve expor pelo menos três endpoints: `GET /health`, `GET /orders` (lista simulada de pedidos) e `POST /orders` (cria um pedido simulado com delay aleatório para simular variação de latência). A aplicação deve rodar como container no Docker Compose e escrever logs em arquivo no diretório compartilhado com o Filebeat. O objetivo não é o domínio em si, mas ter algo realista para instrumentar nos próximos cards.
 
 ---
 
-### [*] Card 7 — Expor métricas Prometheus na aplicação
+### [OK] Card 7 — Expor métricas Prometheus na aplicação
 **Descrição:** Instrumentar a aplicação de exemplo para expor métricas no formato Prometheus usando `prometheus_client`. Adicionar as seguintes métricas: `http_requests_total` (contador com labels `method`, `endpoint`, `status`), `http_request_duration_seconds` (histogram de latência por endpoint) e `app_orders_created_total` (contador de pedidos criados). Configurar o endpoint `/metrics` na aplicação e adicionar um novo `scrape_config` no `prometheus.yml` apontando para ela. Ao final, validar que as métricas aparecem no Prometheus UI e que o Thanos Querier também as serve.
 
 ---

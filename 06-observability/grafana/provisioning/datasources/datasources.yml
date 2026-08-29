@@ -1,12 +1,68 @@
 # =============================================================================
-# Grafana — Data Sources (Provisioning)
-# Preenchido no Card 5
+# Grafana — Data Sources (Provisioning Automático)
+# Card 5: Thanos Querier (metrics) + OpenSearch (logs) + Tempo (traces)
 # =============================================================================
 
 apiVersion: 1
 
 datasources:
-  # Card 5: Thanos Querier como fonte de métricas
-  # Card 5: OpenSearch como fonte de logs
-  # Card 5: Tempo como fonte de traces
-  []
+
+  # ----------------------------------------------------------------
+  # 1. Métricas — Thanos Querier (compatível com Prometheus/PromQL)
+  # ----------------------------------------------------------------
+  - name: Thanos
+    type: prometheus
+    uid: thanos
+    access: proxy
+    url: http://thanos-querier:10902
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+
+  # ----------------------------------------------------------------
+  # 2. Logs — OpenSearch
+  #    Plugin: grafana-opensearch-datasource (instalado via env GF_INSTALL_PLUGINS)
+  # ----------------------------------------------------------------
+  - name: OpenSearch
+    type: grafana-opensearch-datasource
+    uid: opensearch
+    access: proxy
+    url: http://opensearch:9200
+    isDefault: false
+    editable: true
+    jsonData:
+      database: "observability-logs-*"
+      timeField: "@timestamp"
+      version: "2.14.0"
+      flavor: "OpenSearch"
+      logMessageField: "message"
+      logLevelField: "level"
+      maxConcurrentShardRequests: 5
+      pplEnabled: true
+      tlsSkipVerify: true
+
+  # ----------------------------------------------------------------
+  # 3. Traces — Grafana Tempo
+  # ----------------------------------------------------------------
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    editable: false
+    jsonData:
+      httpMethod: GET
+      tracesToLogsV2:
+        datasourceUid: opensearch
+        filterByTraceID: true
+        filterBySpanID: true
+        customQuery: false
+      lokiSearch:
+        datasourceUid: opensearch
+      serviceMap:
+        datasourceUid: thanos
+      search:
+        hide: false

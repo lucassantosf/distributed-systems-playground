@@ -1,2 +1,1 @@
-# routes/ — Módulos de rotas da aplicação
-# Preenchido no Card 6
+from app.routes import orders  # noqa: F401 — mantém importação explícita

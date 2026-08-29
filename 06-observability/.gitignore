@@ -1,18 +1,14 @@
 # =============================================================================
 # .gitignore — 06-observability
 # =============================================================================
-
 # Variáveis de ambiente reais (nunca comitar)
 .env
-
 # Dados persistidos localmente pelos containers
 data/
 volumes/
-
 # Logs da aplicação de exemplo gerados em runtime
 apps/sample-app/logs/
 logs/sample/
-
 # Python
 __pycache__/
 *.pyc
@@ -25,20 +21,20 @@ build/
 .venv/
 venv/
 env/
-
 # Pytest / coverage
 .pytest_cache/
 .coverage
 htmlcov/
-
 # IDEs
 .idea/
 .vscode/
 *.swp
 *.swo
-
 # macOS
 .DS_Store
-
 # Arquivos de debug temporários
 *.log
+# Logs gerados em runtime (bind mount)
+
+# Logs gerados em runtime pela sample-app
+apps/sample-app/logs/*.log
