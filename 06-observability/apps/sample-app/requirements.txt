@@ -1,8 +1,8 @@
 # =============================================================================
 # sample-app — Dependências Python
 # Card 6 : FastAPI base + logging para arquivo
-# Card 7  : prometheus-client (descomentar)
-# Card 8  : opentelemetry-* (descomentar)
+# Card 7  : prometheus-client ✅
+# Card 8  : opentelemetry-* ✅
 # Card 9  : python-json-logger (descomentar)
 # =============================================================================
 
@@ -15,10 +15,12 @@ python-multipart==0.0.9       # necessário para formulários FastAPI
 prometheus-client==0.20.0
 
 # ── Card 8 — Traces OpenTelemetry ────────────────────────────────────────────
-# opentelemetry-api==1.25.0
-# opentelemetry-sdk==1.25.0
-# opentelemetry-instrumentation-fastapi==0.46b0
-# opentelemetry-exporter-otlp-proto-grpc==1.25.0
+# setuptools<72 garante pkg_resources disponível (removido no setuptools>=72)
+setuptools<72
+opentelemetry-api==1.25.0
+opentelemetry-sdk==1.25.0
+opentelemetry-instrumentation-fastapi==0.46b0
+opentelemetry-exporter-otlp-proto-grpc==1.25.0
 
 # ── Card 9 — Logs JSON estruturados ──────────────────────────────────────────
-# python-json-logger==2.0.7
+python-json-logger==2.0.7

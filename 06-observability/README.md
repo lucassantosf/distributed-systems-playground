@@ -225,12 +225,12 @@ docker compose up -d
 
 ---
 
-### [*] Card 8 — Instrumentar a aplicação com OpenTelemetry (Traces)
+### [OK] Card 8 — Instrumentar a aplicação com OpenTelemetry (Traces)
 **Descrição:** Adicionar o **OpenTelemetry SDK** à aplicação para gerar traces distribuídos. Configurar o `TracerProvider` com o exportador OTLP apontando para o OTel Collector. Usar `opentelemetry-instrumentation-fastapi` para auto-instrumentação dos endpoints HTTP. Cada requisição deve gerar um trace com: Span raiz do endpoint HTTP (método, rota, status) e Spans filhos para operações internas simuladas (ex: "query_database", "process_order") com atributos relevantes (ex: `order.id`, `order.status`). Ao final, fazer uma requisição e validar que o trace aparece no Tempo com os Spans corretos na visualização em cascata (waterfall).
 
 ---
 
-### [*] Card 9 — Padronizar logs estruturados com correlação de traces
+### [OK] Card 9 — Padronizar logs estruturados com correlação de traces
 **Descrição:** Configurar a aplicação para emitir logs em **JSON estruturado**. Cada linha de log deve conter: `timestamp` (ISO 8601), `level`, `message`, `service`, `trace_id` e `span_id` — estes dois últimos injetados automaticamente pelo OTel SDK quando dentro de um Span ativo. Essa correlação é o que permitirá no Grafana navegar de um trace até seus logs correspondentes. Atualizar o pipeline do Logstash para fazer parse do JSON (`json` filter) sem quebrar a estrutura. Ao final, gerar uma requisição e confirmar no OpenSearch que o log contém `trace_id` e `span_id` preenchidos corretamente.
 
 ---

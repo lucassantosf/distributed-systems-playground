@@ -11,5 +11,7 @@ APP_ENV: str = os.getenv("APP_ENV", "development")
 LOG_DIR: str = os.getenv("LOG_DIR", "/logs")
 LOG_FILE: str = f"{LOG_DIR}/{APP_NAME}.log"
 
-# Card 8 — OTel Collector endpoint (descomentado no Card 8)
-# OTEL_EXPORTER_ENDPOINT: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317")
+# Card 8 — OTel Collector endpoint (gRPC)
+OTEL_EXPORTER_ENDPOINT: str = os.getenv(
+    "OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4317"
+)
