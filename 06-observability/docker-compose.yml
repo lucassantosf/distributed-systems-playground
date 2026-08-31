@@ -21,6 +21,7 @@ volumes:
   tempo_data:
   opensearch_data:
   grafana_data:
+  alertmanager_data:
   # logs_data foi substituído por bind mount (./logs-output) para visibilidade direta dos logs
 
 services:
@@ -50,6 +51,26 @@ services:
       - "9090:9090"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - observability_network
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./metrics/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -109,6 +130,27 @@ services:
       - "10902:10902"
     depends_on:
       - thanos-sidecar
+      - thanos-store
+    networks:
+      - observability_network
+
+  thanos-compactor:
+    image: quay.io/thanos/thanos:v0.35.1
+    container_name: thanos-compactor
+    restart: unless-stopped
+    command:
+      - "compact"
+      - "--wait"
+      - "--data-dir=/thanos/compact"
+      - "--objstore.config={type: FILESYSTEM, config: {directory: /thanos/store}}"
+      - "--retention.resolution-raw=14d"
+      - "--retention.resolution-5m=30d"
+      - "--retention.resolution-1h=90d"
+      - "--compact.concurrency=1"
+    user: root
+    volumes:
+      - thanos_data:/thanos/store
+    depends_on:
       - thanos-store
     networks:
       - observability_network

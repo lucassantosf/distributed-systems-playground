@@ -1,6 +1,7 @@
 # =============================================================================
-# Grafana Tempo — Configuração de Storage e Receivers
-# Preenchido no Card 4
+# Grafana Tempo — Configuração de Storage, Receivers e Metrics Generator
+# Card 4  : Storage + OTLP receivers
+# Card 12 : metrics_generator habilitado para Service Graph e Span Metrics
 # =============================================================================
 
 server:
@@ -14,6 +15,29 @@ distributor:
           endpoint: 0.0.0.0:4317
         http:
           endpoint: 0.0.0.0:4318
+
+# Card 12: Gera métricas a partir de traces — alimenta o Service Graph no Grafana.
+# Os dados são escritos no Prometheus via remote_write e consultados via Thanos.
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: local
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+  processor:
+    service_graphs:
+      dimensions: []
+    span_metrics:
+      dimensions: []
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
 
 storage:
   trace:

@@ -237,22 +237,22 @@ docker compose up -d
 
 # [*] Epic 3 — Dashboards e Visualização
 
-### [*] Card 10 — Criar dashboard de Métricas no Grafana
+### [OK] Card 10 — Criar dashboard de Métricas no Grafana
 **Descrição:** Criar um dashboard de métricas da aplicação provisionado automaticamente via arquivo JSON em `grafana/provisioning/dashboards/` (não criado manualmente pela UI). Deve conter pelo menos: painel de **Taxa de Requisições** (`rate(http_requests_total[1m])` por endpoint), **Latência P50/P95/P99** (`histogram_quantile`), **Taxa de Erros** (requisições 5xx) e **Total de Pedidos Criados**. Ao final, gerar carga na aplicação e observar os painéis atualizando em tempo real.
 
 ---
 
-### [*] Card 11 — Criar dashboard de Logs no Grafana
+### [OK] Card 11 — Criar dashboard de Logs no Grafana
 **Descrição:** Criar um dashboard de logs provisionado via arquivo JSON. Deve conter: painel de **Volume de Logs por Nível** (INFO/WARN/ERROR ao longo do tempo), painel de **Logs Recentes** (tabela com `timestamp`, `level`, `message`, `service`, `trace_id`) e um painel com filtro por `level=ERROR` para visualizar erros críticos rapidamente. Gerar manualmente alguns logs de WARN e ERROR na aplicação (ex: endpoint que força um erro) e validar que aparecem no dashboard.
 
 ---
 
-### [*] Card 12 — Explorar Traces no Grafana via Tempo
+### [OK] Card 12 — Explorar Traces no Grafana via Tempo
 **Descrição:** Configurar a exploração de traces no Grafana usando o **Explore** com a fonte de dados Tempo. Criar um dashboard com: painel de **Service Graph** (mapa de dependências e taxa de requisições entre serviços) e painel de **Trace Search** (últimos traces com duração e status). Explorar o **TraceQL** para buscas como `{.http.route="/orders" && duration > 100ms}`. Ao final, conseguir localizar um trace específico, abrir sua visualização de Spans em cascata e identificar qual Span apresentou maior duração.
 
 ---
 
-### [*] Card 13 — Configurar correlação entre os três sinais
+### [OK] Card 13 — Configurar correlação entre os três sinais
 **Descrição:** Configurar no Grafana os **data links** que permitem navegar entre os três sinais de forma fluida — este é o coração do projeto. (1) **Metrics → Traces**: no dashboard de métricas, um link que ao clicar em um ponto de latência alta abre o Explore do Tempo filtrado pelo intervalo de tempo e serviço. (2) **Traces → Logs**: na visualização de um trace no Tempo, o link "Related Logs" abre o OpenSearch filtrado pelo `trace_id` daquele trace. (3) **Logs → Traces**: na tabela de logs, o campo `trace_id` é um link clicável que abre o trace correspondente no Tempo. Ao final, simular uma investigação real completa: spike de latência na métrica → trace lento → logs daquele trace.
 
 ---
@@ -265,7 +265,7 @@ docker compose up -d
 ---
 
 ### [*] Card 15 — Configurar retenção e compactação no Thanos
-**Descrição:** Explorar as funcionalidades de retenção do Thanos adicionando o **Thanos Compactor** ao Docker Compose. O Compactor é responsável por compactar blocos de métricas antigos e aplicar downsampling progressivo: resolução de 5min para dados com mais de 2h e resolução de 1h para dados com mais de 8h. Definir o período de retenção via flags do Compactor e observar via logs como os blocos são processados. O objetivo é entender na prática como o Thanos gerencia armazenamento de longo prazo — algo que o Prometheus standalone não oferece.
+**Descrição:** Explorar as funcionalidades de retenção do Thanos adicionando o **Thanos Compactor** ao Docker Compose. O Compactor é responsável por compactar blocos de métricas antigos e aplicar downsampling progressivo: resolução de 5min para dados com mais de 2h me resolução de 1h para dados com mais de 8h. Definir o período de retenção via flags do Compactor e observar via logs como os blocos são processados. O objetivo é entender na prática como o Thanos gerencia armazenamento de longo prazo — algo que o Prometheus standalone não oferece.
 
 ---
 

@@ -16,6 +16,11 @@ global:
 rule_files:
   - "alert-rules.yml"
 
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
 
   # ------------------------------------------------------------------
@@ -31,3 +36,10 @@ scrape_configs:
   - job_name: "sample-app"
     static_configs:
       - targets: ["sample-app:8000"]
+
+  # ------------------------------------------------------------------
+  # Card 18 — producer-api (Projeto 05 — Event Streaming Platform)
+  # ------------------------------------------------------------------
+  - job_name: "producer-api"
+    static_configs:
+      - targets: ["producer-api:8000"]

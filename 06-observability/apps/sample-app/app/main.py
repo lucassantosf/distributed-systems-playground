@@ -15,6 +15,7 @@ from app.logging_config import setup_logging
 from app.metrics import get_metrics_app, http_requests_total, http_request_duration_seconds
 from app.telemetry import setup_tracing
 from app.routes.orders import router as orders_router
+from app.routes.debug import router as debug_router
 
 log = setup_logging()
 
@@ -33,6 +34,7 @@ app.mount("/metrics", get_metrics_app())
 
 # Routers
 app.include_router(orders_router)
+app.include_router(debug_router)
 
 
 @app.middleware("http")

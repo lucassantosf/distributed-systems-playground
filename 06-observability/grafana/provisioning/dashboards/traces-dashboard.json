@@ -1,0 +1,199 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "datasource", "id": "tempo", "name": "Tempo", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "Traces distribuídos da sample-app: Service Graph, Trace Search e análise via TraceQL (Card 12)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Service Graph",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "description": "Mapa de dependências entre serviços gerado automaticamente a partir dos traces. Mostra a taxa de requisições e latência entre cada serviço.",
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {},
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "serviceMap",
+          "refId": "A",
+          "serviceMapQuery": "{}"
+        }
+      ],
+      "title": "Service Map",
+      "type": "nodeGraph"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 101,
+      "title": "Métricas de Spans (geradas pelo Tempo metrics_generator)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Taxa de requisições por operação (span_name) gerada automaticamente pelo Tempo span-metrics processor",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "sum by (span_name) (rate(traces_spanmetrics_calls_total{service=\"sample-app\"}[1m]))",
+          "legendFormat": "{{span_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Taxa de Chamadas por Span (span-metrics)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Latência P95 por operação — gerada pelo Tempo span-metrics processor a partir dos histogramas de duration",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "histogram_quantile(0.95, sum by (span_name, le) (rate(traces_spanmetrics_duration_seconds_bucket{service=\"sample-app\"}[1m])))",
+          "legendFormat": "P95 {{span_name}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Latência P95 por Span (span-metrics)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 102,
+      "title": "Trace Search — Últimos Traces",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "description": "Lista dos traces mais recentes. Clique em qualquer trace para abrir a visualização em cascata (waterfall) com todos os spans.\n\nTraceQL úteis para explorar no Explore:\n• Todos os traces lentos: {duration > 300ms}\n• POST /orders com latência alta: {.http.route=\"/orders\" && .http.method=\"POST\" && duration > 200ms}\n• Traces com span order.process: {name=\"order.process\"}\n• Erros HTTP: {status=error}",
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 25 },
+      "id": 20,
+      "options": {
+        "dedupStrategy": "none"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "filters": [],
+          "limit": 20,
+          "queryType": "traceql",
+          "refId": "A",
+          "tableType": "traces",
+          "query": "{resource.service.name=\"sample-app\"}"
+        }
+      ],
+      "title": "Últimos Traces — sample-app (TraceQL: {resource.service.name=\"sample-app\"})",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "id": 103,
+      "title": "Traces Lentos (duration > 200ms)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "description": "Traces que levaram mais de 200ms — candidatos a investigação.\nPara um trace específico: clique → Explore → veja o waterfall completo com spans filhos.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 42 },
+      "id": 21,
+      "options": {
+        "dedupStrategy": "none"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "filters": [],
+          "limit": 10,
+          "queryType": "traceql",
+          "refId": "A",
+          "tableType": "traces",
+          "query": "{resource.service.name=\"sample-app\" && duration > 200ms}"
+        }
+      ],
+      "title": "Traces Lentos — duration > 200ms",
+      "type": "table"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["observability", "sample-app", "traces"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Sample App — Traces",
+  "uid": "sample-app-traces",
+  "version": 1
+}

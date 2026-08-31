@@ -1,0 +1,119 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "Dashboard de Observabilidade para o Projeto 05 — Event Streaming Platform (Card 18)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Kafka Producer Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Taxa de eventos publicados no Kafka por segundo",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 80 },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "sum by (topic) (rate(kafka_events_published_total[1m]))",
+          "legendFormat": "Tópico: {{topic}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Taxa de Publicação de Eventos (events/s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Latência P95 de publicação de eventos no Kafka",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "lineWidth": 2 },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(kafka_publish_duration_seconds_bucket[1m])))",
+          "legendFormat": "P95 Latência Publicação",
+          "refId": "A"
+        }
+      ],
+      "title": "Latência de Publicação P95",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "id": 101,
+      "title": "Producer API Logs",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "description": "Logs estruturados do producer-api (Projeto 05)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 10 },
+      "id": 3,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "query": "service:producer-api",
+          "refId": "A",
+          "timeField": "@timestamp",
+          "metrics": [{ "id": "1", "type": "logs", "settings": { "limit": "200" } }]
+        }
+      ],
+      "title": "Logs — producer-api",
+      "type": "logs"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["observability", "project-05", "kafka"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Projeto 05 — Event Streaming Platform",
+  "uid": "project-05-event-streaming",
+  "version": 1
+}
