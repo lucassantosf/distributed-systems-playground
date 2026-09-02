@@ -259,30 +259,55 @@ docker compose up -d
 
 # [*] Epic 4 — Alertas e Qualidade dos Dados
 
-### [*] Card 14 — Configurar alertas no Prometheus (Alertmanager)
+### [OK] Card 14 — Configurar alertas no Prometheus (Alertmanager)
 **Descrição:** Adicionar o **Alertmanager** ao Docker Compose e configurar regras de alerta no Prometheus via arquivo `alert-rules.yml`. Criar pelo menos três regras: `HighErrorRate` (taxa de erros 5xx acima de 5% nos últimos 5 minutos), `HighLatency` (P95 de latência acima de 500ms) e `ServiceDown` (target de scraping inacessível). Configurar o Alertmanager com um receiver simples (log para console ou webhook local). Ao final, forçar intencionalmente cada condição na aplicação e validar que os alertas disparam na UI do Alertmanager e em `/alerts` do Prometheus.
 
 ---
 
-### [*] Card 15 — Configurar retenção e compactação no Thanos
+### [OK] Card 15 — Configurar retenção e compactação no Thanos
 **Descrição:** Explorar as funcionalidades de retenção do Thanos adicionando o **Thanos Compactor** ao Docker Compose. O Compactor é responsável por compactar blocos de métricas antigos e aplicar downsampling progressivo: resolução de 5min para dados com mais de 2h me resolução de 1h para dados com mais de 8h. Definir o período de retenção via flags do Compactor e observar via logs como os blocos são processados. O objetivo é entender na prática como o Thanos gerencia armazenamento de longo prazo — algo que o Prometheus standalone não oferece.
 
 ---
 
-### [*] Card 16 — Validar qualidade e completude da observabilidade
+### [OK] Card 16 — Validar qualidade e completude da observabilidade
 **Descrição:** Criar um script `scripts/validate_observability.py` que verifica automaticamente se os três pilares estão funcionando de ponta a ponta. O script deve: (1) fazer uma requisição à aplicação e capturar o `trace_id` retornado no header de resposta; (2) consultar o Prometheus e verificar se `http_requests_total` foi incrementado; (3) consultar o Tempo via API e verificar se o trace com aquele `trace_id` existe com os Spans esperados; (4) consultar o OpenSearch e verificar se existe um log com aquele `trace_id`. Retornar `PASS/FAIL` para cada verificação. Esse card valida que observabilidade está completa e correlacionada de ponta a ponta.
 
 ---
 
 # [*] Epic 5 — Integração com Projetos da Trilha
 
-### [*] Card 17 — Documentar como integrar outros projetos
+### [OK] Card 17 — Documentar como integrar outros projetos
 **Descrição:** Criar um arquivo `INTEGRATION.md` descrevendo como qualquer projeto da trilha pode se conectar a esta plataforma. O documento deve ser prático, com instruções para: (1) adicionar a rede Docker da plataforma de observabilidade ao `docker-compose.yml` do projeto externo via `networks: external: name: observability_network`; (2) adicionar um novo `scrape_config` no `prometheus.yml` para o novo serviço; (3) configurar o Filebeat para coletar logs do novo serviço; (4) configurar o OTel SDK no projeto externo apontando para o OTel Collector desta plataforma. Incluir um exemplo concreto de `docker-compose.override.yml` baseado no projeto 05 (Event Streaming Platform).
 
 ---
 
 ### [*] Card 18 — Integrar com o Projeto 05 (Event Streaming Platform)
-**Descrição:** Aplicar na prática o guia do Card 17, conectando o `05-event-streaming-platform` a esta plataforma. Instrumentar o `producer-api` do projeto 05 com o OTel SDK para gerar traces nas rotas de publicação de eventos. Adicionar métricas Prometheus no producer-api: `kafka_events_published_total` (por tópico) e `kafka_publish_duration_seconds`. Configurar o Filebeat para coletar os logs do producer-api. No Grafana, criar um dashboard específico para o projeto 05 com painéis de taxa de publicação de eventos, latência e volume de logs. Ao final, publicar um evento e conseguir visualizar a métrica incrementada, o trace no Tempo e o log no Grafana — todos correlacionados pelo mesmo `trace_id`.
+**Objetivo:** Aplicar na prática o guia do Card 17, conectando o `05-event-streaming-platform` a esta plataforma de observabilidade. Ao final, publicar um evento e visualizar a métrica, o trace e o log correlacionados pelo mesmo `trace_id` no Grafana.
+
+---
+
+#### [*] Card 18.1 — Conectar a rede Docker e configurar o OTel SDK no producer-api
+**Descrição:** Adicionar a `observability_network` ao `docker-compose.yml` do Projeto 05 via `docker-compose.override.yml`. Instalar as bibliotecas OTel no `producer-api` (`opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-grpc`, `opentelemetry-instrumentation-fastapi`). Criar um arquivo `telemetry.py` no producer-api que inicializa o `TracerProvider` com o exporter apontando para `otel-collector:4317` e instrumenta automaticamente o FastAPI. Ao final, verificar no Grafana Tempo que traces do `producer-api` já aparecem.
+
+---
+
+#### [*] Card 18.2 — Adicionar logging estruturado JSON com trace_id no producer-api
+**Descrição:** Criar um `logging_config.py` no producer-api análogo ao da `sample-app`: logs em formato JSON com campos `timestamp`, `level`, `service`, `trace_id` e `message`. O `trace_id` deve ser extraído do span ativo via `trace.get_current_span()`. Configurar o Filebeat para coletar os logs do producer-api adicionando um novo input em `logs/filebeat/filebeat.yml`. Ao final, verificar no dashboard de Logs do Grafana que os logs do `producer-api` aparecem com o campo `trace_id` preenchido.
+
+---
+
+#### [*] Card 18.3 — Adicionar métricas Prometheus no producer-api
+**Descrição:** Instalar `prometheus-client` no producer-api. Criar um arquivo `metrics.py` com os contadores: `kafka_events_published_total` (por tópico e status) e o histogram `kafka_publish_duration_seconds`. Instrumentar o endpoint de publicação de eventos para incrementar as métricas. Adicionar o middleware de métricas HTTP (análogo ao da `sample-app`) e expor o endpoint `/metrics`. Adicionar o job `producer-api` no `prometheus.yml` da plataforma e reiniciar o Prometheus. Ao final, verificar na UI do Prometheus que o target está `UP` e as métricas aparecem.
+
+---
+
+#### [*] Card 18.4 — Criar dashboard no Grafana para o Projeto 05
+**Descrição:** O arquivo `grafana/provisioning/dashboards/event-streaming-dashboard.json` já existe como placeholder com painéis de `kafka_events_published_total` e `kafka_publish_duration_seconds`. Validar e completar o dashboard adicionando: painel de **taxa de requisições HTTP** do producer-api, painel de **latência P95** de publicação, painel de **logs recentes** do producer-api e um painel de **taxa de erros**. Provisionar via arquivo e verificar que o dashboard aparece no Grafana após `docker compose restart grafana`.
+
+---
+
+#### [*] Card 18.5 — Validação E2E: publicar evento e correlacionar os três sinais
+**Descrição:** Com todos os sub-cards anteriores concluídos, realizar a validação final. Subir o Projeto 05 com `docker compose up -d` (usando o override da rede). Publicar um evento via `POST /orders` no producer-api. Verificar no Grafana: (1) o contador `kafka_events_published_total` foi incrementado no dashboard do Projeto 05; (2) o trace da requisição aparece no Tempo com os Spans do FastAPI e da publicação Kafka; (3) o log estruturado com o mesmo `trace_id` aparece no OpenSearch. Documentar o resultado no README com o `trace_id` real usado na validação.
 
 ---
 

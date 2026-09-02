@@ -1,0 +1,25 @@
+# =============================================================================
+# docker-compose.override.yml — Card 18.1
+# Conecta o producer-api à rede da plataforma de observabilidade e configura
+# as variáveis de ambiente para envio de traces ao OTel Collector.
+#
+# Como usar:
+#   cd 05-event-streaming-platform/
+#   docker compose up -d          ← o override é detectado automaticamente
+# =============================================================================
+
+services:
+  producer-api:
+    environment:
+      # OTel SDK — aponta para o OTel Collector da plataforma de observabilidade
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+      OTEL_SERVICE_NAME: "producer-api"
+      OTEL_ENV: "local"
+    networks:
+      - default
+      - observability_network
+
+networks:
+  observability_network:
+    external: true
+    name: observability_network

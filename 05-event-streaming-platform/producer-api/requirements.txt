@@ -6,3 +6,6 @@ alembic
 psycopg2-binary
 pydantic
 python-dotenv
+# Card 18.1 — OpenTelemetry (Traces)
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-grpc==1.27.0

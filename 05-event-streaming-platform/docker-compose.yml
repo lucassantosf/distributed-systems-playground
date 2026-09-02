@@ -93,7 +93,7 @@ services:
       dockerfile: Dockerfile
     container_name: producer-api
     ports:
-      - "8000:8000"
+      - "8001:8000"   # Card 18.1: alterado de 8000 para evitar conflito com sample-app do Projeto 06
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/db_producer
