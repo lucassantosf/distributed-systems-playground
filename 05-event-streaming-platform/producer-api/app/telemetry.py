@@ -12,7 +12,7 @@ import time
 
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
@@ -43,7 +43,7 @@ def setup_tracing(app) -> None:
         endpoint=_OTEL_ENDPOINT,
         insecure=True,
     )
-    provider.add_span_processor(BatchSpanProcessor(exporter))
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
     propagate.set_global_textmap(_propagator)
 

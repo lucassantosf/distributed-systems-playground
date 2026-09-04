@@ -286,12 +286,12 @@ docker compose up -d
 
 ---
 
-#### [*] Card 18.1 — Conectar a rede Docker e configurar o OTel SDK no producer-api
+#### [OK] Card 18.1 — Conectar a rede Docker e configurar o OTel SDK no producer-api
 **Descrição:** Adicionar a `observability_network` ao `docker-compose.yml` do Projeto 05 via `docker-compose.override.yml`. Instalar as bibliotecas OTel no `producer-api` (`opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-grpc`, `opentelemetry-instrumentation-fastapi`). Criar um arquivo `telemetry.py` no producer-api que inicializa o `TracerProvider` com o exporter apontando para `otel-collector:4317` e instrumenta automaticamente o FastAPI. Ao final, verificar no Grafana Tempo que traces do `producer-api` já aparecem.
 
 ---
 
-#### [*] Card 18.2 — Adicionar logging estruturado JSON com trace_id no producer-api
+#### [OK] Card 18.2 — Adicionar logging estruturado JSON com trace_id no producer-api
 **Descrição:** Criar um `logging_config.py` no producer-api análogo ao da `sample-app`: logs em formato JSON com campos `timestamp`, `level`, `service`, `trace_id` e `message`. O `trace_id` deve ser extraído do span ativo via `trace.get_current_span()`. Configurar o Filebeat para coletar os logs do producer-api adicionando um novo input em `logs/filebeat/filebeat.yml`. Ao final, verificar no dashboard de Logs do Grafana que os logs do `producer-api` aparecem com o campo `trace_id` preenchido.
 
 ---

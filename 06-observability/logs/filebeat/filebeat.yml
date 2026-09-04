@@ -5,16 +5,26 @@
 # =============================================================================
 
 filebeat.inputs:
+  # sample-app logs (Card 9)
   - type: log
     enabled: true
-    # Monitora todos os arquivos .log dentro do diretório compartilhado
     paths:
-      - /logs/*.log
-    # Aguarda 5s sem atividade para fechar o file handle
+      - /logs/sample-app/*.log
     close_inactive: 5s
-    # Campos adicionados a todos os eventos
     fields:
       env: development
+      service: sample-app
+    fields_under_root: true
+
+  # Card 18.2 — producer-api logs
+  - type: log
+    enabled: true
+    paths:
+      - /logs/producer-api/*.log
+    close_inactive: 5s
+    fields:
+      env: development
+      service: producer-api
     fields_under_root: true
 
 # Envia os eventos para o Logstash (não diretamente ao OpenSearch)

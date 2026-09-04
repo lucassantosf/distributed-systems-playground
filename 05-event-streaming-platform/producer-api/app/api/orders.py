@@ -7,6 +7,7 @@ GET    /orders/{order_id}           → consulta pedido (útil para validação 
 """
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -21,8 +22,10 @@ from app.database import get_db
 from app.kafka.producer import get_kafka_producer, KafkaProducerWrapper
 from app.models.order import Order
 from app.services import order_service
+from app.logging_config import setup_logging  # Card 18.2
 
-logger = logging.getLogger(__name__)
+# Usa o logger estruturado JSON do producer-api (com trace_id injetado)
+logger = setup_logging()
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -41,6 +44,8 @@ def create_order(
 ):
     items_data = [item.model_dump() for item in body.items]
 
+    logger.info("POST /orders — criando pedido", extra={"customer_id": body.customer_id})
+
     order, event_published = order_service.create_order(
         db=db,
         customer_id=body.customer_id,
@@ -50,6 +55,11 @@ def create_order(
         producer=producer,
         simulate_error=body.simulate_error,
         fail_until_retry=body.fail_until_retry,
+    )
+
+    logger.info(
+        f"Pedido {order.id} criado — evento_publicado={event_published}",
+        extra={"order_id": str(order.id), "event_published": event_published},
     )
 
     return OrderResponse(

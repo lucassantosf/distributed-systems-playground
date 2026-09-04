@@ -212,7 +212,8 @@ services:
     command: filebeat -e -strict.perms=false
     volumes:
       - ./logs/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - ./apps/sample-app/logs:/logs:ro
+      - ./apps/sample-app/logs:/logs/sample-app:ro    # Card 9: sample-app
+      - ./apps/producer-api/logs:/logs/producer-api:ro # Card 18.2: producer-api
     depends_on:
       logstash:
         condition: service_healthy

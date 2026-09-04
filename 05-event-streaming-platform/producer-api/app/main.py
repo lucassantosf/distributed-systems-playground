@@ -8,7 +8,11 @@ import logging
 from fastapi import FastAPI
 
 from app.api.orders import router as orders_router
-from app.telemetry import setup_tracing  # Card 18.1
+from app.telemetry import setup_tracing   # Card 18.1
+from app.logging_config import setup_logging  # Card 18.2
+
+# Card 18.2 — Inicializa logging JSON estruturado com trace_id
+logger = setup_logging()
 
 logging.basicConfig(
     level=logging.INFO,
