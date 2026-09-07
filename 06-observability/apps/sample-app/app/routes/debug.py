@@ -55,11 +55,11 @@ async def force_error() -> dict:
     raise HTTPException(status_code=500, detail="Erro 500 simulado para teste de alerta")
 
 
-@router.get("/slow", summary="Força uma latência de 600ms para testar o alerta HighLatency")
-async def force_slow() -> dict:
+@router.get("/slow", summary="Força uma latência configurável (padrão 2.5s) para testar o alerta HighLatency")
+async def force_slow(delay: float = 2.5) -> dict:
     """
-    Aguarda 0.6s para elevar o percentil P95 de latência da aplicação.
+    Aguarda N segundos (padrão 2.5s) para elevar os percentis P95/P99 de latência.
     """
-    log.warning("Simulando rota lenta de 600ms em /debug/slow")
-    await asyncio.sleep(0.6)
-    return {"status": "slow_response", "delay_ms": 600}
+    log.warning("Simulando rota lenta de %.2fs em /debug/slow", delay)
+    await asyncio.sleep(delay)
+    return {"status": "slow_response", "delay_s": delay}

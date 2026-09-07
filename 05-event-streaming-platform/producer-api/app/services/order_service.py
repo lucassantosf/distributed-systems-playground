@@ -10,12 +10,18 @@ Fluxo: HTTP request → order_service → PostgreSQL + Kafka → response
 """
 
 import logging
+import time
 import uuid
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.kafka.producer import KafkaProducerWrapper
+from app.metrics import (
+    kafka_events_published_total,
+    kafka_publish_duration_seconds,
+    orders_created_total,
+)
 from app.models.order import Order, OrderItem
 from shared.schemas.order import (
     OrderCreatedPayload,
@@ -79,9 +85,12 @@ def create_order(
     db.commit()
     db.refresh(order)
     logger.info(f"Pedido persistido | order_id={order_id}")
+    orders_created_total.inc()
 
     # ── 3. Publicar evento no Kafka com roteamento automático (Card 8) ─────
     event_published = False
+    topic_name = "orders.created"
+    start_time = time.perf_counter()
     try:
         payload = OrderCreatedPayload(
             customer_id=customer_id,
@@ -102,11 +111,18 @@ def create_order(
             fail_until_retry=fail_until_retry,
         )
         event = create_order_created_event(order_id=order_id, payload=payload)
+        topic_name = event.event_type.topic
         producer.produce_event(event)
         producer.flush()
+        duration = time.perf_counter() - start_time
+        kafka_publish_duration_seconds.labels(topic=topic_name).observe(duration)
+        kafka_events_published_total.labels(topic=topic_name, status="success").inc()
         event_published = True
-        logger.info(f"Evento OrderCreated publicado | order_id={order_id} topic={event.event_type.topic}")
+        logger.info(f"Evento OrderCreated publicado | order_id={order_id} topic={topic_name}")
     except Exception as exc:
+        duration = time.perf_counter() - start_time
+        kafka_publish_duration_seconds.labels(topic=topic_name).observe(duration)
+        kafka_events_published_total.labels(topic=topic_name, status="error").inc()
         logger.error(f"Falha ao publicar evento no Kafka | order_id={order_id} erro={exc}")
 
     return order, event_published
@@ -136,6 +152,8 @@ def update_order_status(
     logger.info(f"Status atualizado | order_id={order_id} {previous_status} → {new_status}")
 
     event_published = False
+    topic_name = "orders.updated"
+    start_time = time.perf_counter()
     try:
         payload = OrderUpdatedPayload(
             previous_status=previous_status,
@@ -143,11 +161,18 @@ def update_order_status(
             reason=reason,
         )
         event = create_order_updated_event(order_id=order_id, payload=payload)
+        topic_name = event.event_type.topic
         producer.produce_event(event)
         producer.flush()
+        duration = time.perf_counter() - start_time
+        kafka_publish_duration_seconds.labels(topic=topic_name).observe(duration)
+        kafka_events_published_total.labels(topic=topic_name, status="success").inc()
         event_published = True
-        logger.info(f"Evento OrderUpdated publicado | order_id={order_id} topic={event.event_type.topic}")
+        logger.info(f"Evento OrderUpdated publicado | order_id={order_id} topic={topic_name}")
     except Exception as exc:
+        duration = time.perf_counter() - start_time
+        kafka_publish_duration_seconds.labels(topic=topic_name).observe(duration)
+        kafka_events_published_total.labels(topic=topic_name, status="error").inc()
         logger.error(f"Falha ao publicar evento no Kafka | order_id={order_id} erro={exc}")
 
     return order, event_published

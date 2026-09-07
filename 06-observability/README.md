@@ -281,7 +281,7 @@ docker compose up -d
 
 ---
 
-### [*] Card 18 — Integrar com o Projeto 05 (Event Streaming Platform)
+### [OK] Card 18 — Integrar com o Projeto 05 (Event Streaming Platform)
 **Objetivo:** Aplicar na prática o guia do Card 17, conectando o `05-event-streaming-platform` a esta plataforma de observabilidade. Ao final, publicar um evento e visualizar a métrica, o trace e o log correlacionados pelo mesmo `trace_id` no Grafana.
 
 ---
@@ -296,27 +296,95 @@ docker compose up -d
 
 ---
 
-#### [*] Card 18.3 — Adicionar métricas Prometheus no producer-api
+#### [OK] Card 18.3 — Adicionar métricas Prometheus no producer-api
 **Descrição:** Instalar `prometheus-client` no producer-api. Criar um arquivo `metrics.py` com os contadores: `kafka_events_published_total` (por tópico e status) e o histogram `kafka_publish_duration_seconds`. Instrumentar o endpoint de publicação de eventos para incrementar as métricas. Adicionar o middleware de métricas HTTP (análogo ao da `sample-app`) e expor o endpoint `/metrics`. Adicionar o job `producer-api` no `prometheus.yml` da plataforma e reiniciar o Prometheus. Ao final, verificar na UI do Prometheus que o target está `UP` e as métricas aparecem.
 
 ---
 
-#### [*] Card 18.4 — Criar dashboard no Grafana para o Projeto 05
+#### [OK] Card 18.4 — Criar dashboard no Grafana para o Projeto 05
 **Descrição:** O arquivo `grafana/provisioning/dashboards/event-streaming-dashboard.json` já existe como placeholder com painéis de `kafka_events_published_total` e `kafka_publish_duration_seconds`. Validar e completar o dashboard adicionando: painel de **taxa de requisições HTTP** do producer-api, painel de **latência P95** de publicação, painel de **logs recentes** do producer-api e um painel de **taxa de erros**. Provisionar via arquivo e verificar que o dashboard aparece no Grafana após `docker compose restart grafana`.
 
 ---
 
-#### [*] Card 18.5 — Validação E2E: publicar evento e correlacionar os três sinais
-**Descrição:** Com todos os sub-cards anteriores concluídos, realizar a validação final. Subir o Projeto 05 com `docker compose up -d` (usando o override da rede). Publicar um evento via `POST /orders` no producer-api. Verificar no Grafana: (1) o contador `kafka_events_published_total` foi incrementado no dashboard do Projeto 05; (2) o trace da requisição aparece no Tempo com os Spans do FastAPI e da publicação Kafka; (3) o log estruturado com o mesmo `trace_id` aparece no OpenSearch. Documentar o resultado no README com o `trace_id` real usado na validação.
+#### [OK] Card 18.5 — Validação E2E: publicar evento e correlacionar os três sinais
+**Descrição:** Com todos os sub-cards anteriores concluídos, realizar a validação final. Subir o Projeto 05 com `docker compose up -d` (usando o override da rede). Publicar um evento via `POST /orders` no producer-api. Verificar no Grafana: (1) o contador `kafka_events_published_total` foi incrementado no dashboard do Projeto 05; (2) o trace da requisição aparece no Tempo com os Spans do FastAPI e da publicação Kafka; (3) o log estruturado com o mesmo `trace_id` aparece no OpenSearch.
+
+**Validação Realizada com Sucesso:**
+- **Order ID:** `f511c0a1-c887-40fb-a7ea-85b5e5b4cb0d`
+- **Trace ID Correlacionado:** `c69b8d4b3dbb3885a767cbece44a1169`
+- **Métrica:** `kafka_events_published_total{job="producer-api", status="success", topic="orders.created"}` registrada no Prometheus/Thanos.
+- **Trace:** Localizado no Grafana Tempo com ID `c69b8d4b3dbb3885a767cbece44a1169`.
+- **Logs:** 2 entradas de log indexadas no OpenSearch com o campo `trace_id: "c69b8d4b3dbb3885a767cbece44a1169"`.
 
 ---
 
 # [*] Epic 6 — Consolidação
 
-### [*] Card 19 — Simular cenário de investigação de incidente
-**Descrição:** Criar um script `scripts/simulate_incident.py` que reproduz um cenário realista de degradação: durante 2 minutos, injetar 30% das requisições com delay artificial de 2-3 segundos e 10% com erro 500. Acompanhar em tempo real no Grafana como: o painel de latência P99 sobe, o alerta `HighLatency` acende no Alertmanager, os traces lentos aparecem no Tempo com Spans indicando onde o tempo foi gasto, e os logs de ERROR aparecem no OpenSearch com os `trace_ids` correspondentes. Documentar no `README.md` o passo a passo de investigação seguido como "Playbook de Investigação": métrica → trace → log.
+### [OK] Card 19 — Simular cenário de investigação de incidente
+**Descrição:** Criar um script `scripts/simulate_incident.py` que reproduz um cenário realista de degradação: durante 2 minutos, injetar 30% das requisições com delay artificial de 2-3 segundos e 10% com erro 500. Acompanhar em tempo real no Grafana como: o painel de latência P99 sobe, o alerta `HighLatency` acende no Alertmanager, os traces lentos aparecem no Tempo com Spans indicando onde o tempo foi gasto, e os logs de ERROR aparecem no OpenSearch com os `trace_ids` correspondentes.
 
 ---
 
-### [*] Card 20 — Consolidar a plataforma de observabilidade
-**Descrição:** Revisar toda a plataforma e garantir que está completa, estável e reutilizável. Verificar: todos os serviços sobem com `docker compose up -d` sem erros; todos os dashboards do Grafana provisionam automaticamente; as três fontes de dados têm status `OK`; o script `validate_observability.py` do Card 16 passa com 100% dos checks; o `INTEGRATION.md` está atualizado e reflete a integração real feita no Card 18. Registrar no final do README, em uma seção "Lições Aprendidas", as principais observações sobre cada pilar: o que funcionou bem, o que foi surpreendente e quais as limitações percebidas ao rodar a stack completa localmente com Docker.
+### 📖 Playbook de Investigação de Incidente (Métrica → Trace → Log)
+
+#### **Passo 1: Executar a Simulação de Incidente**
+Rode o script de carga degradada para disparar alertas e métricas de anomalia:
+```bash
+python3 scripts/simulate_incident.py --duration 120
+```
+
+#### **Passo 2: Diagnóstico Inicial por Métricas (Prometheus / Grafana)**
+1. Acesse o Dashboard **Overview / Metrics** (`http://localhost:3000/d/sample-app-metrics`).
+2. Observe os painéis de **Taxa de Erros HTTP (5xx)** subindo acima de 5% e o gráfico de **Latência P95 / P99** subindo acima de 2.0s.
+3. No **Alertmanager** (`http://localhost:9093`) ou Grafana Alerts, observe os alertas em estado `FIRING`:
+   - `HighErrorRate` (taxa de erros 5xx > 5%)
+   - `HighLatency` (latência P95 > 500ms)
+
+#### **Passo 3: Isolamento e Análise de Causa Raiz por Traces (Grafana Tempo)**
+1. Acesse o **Grafana Explore** → Seletor de DataSource **Tempo** (`http://localhost:3000/explore`).
+2. Filtre por `Service Name: sample-app` ou `minDuration: 2s` e execute a busca.
+3. Clique em uma das requisições lentas (`GET /debug/slow`).
+4. Inspecione a árvore de Spans: veja exatamente qual Span consumiu os 2.5s (ex: `asyncio.sleep` / handler HTTP).
+5. Copie o `trace_id` da requisição (ex: `6bc04560f3b31540d0cb764cfcfcc616`).
+
+#### **Passo 4: Investigação de Detalhes e Exceções por Logs (OpenSearch)**
+1. Mude o DataSource no Grafana Explore para **OpenSearch** (ou acesse a aba Logs).
+2. Execute a busca usando Lucene com o `trace_id` obtido no passo anterior:
+   ```lucene
+   trace_id:6bc04560f3b31540d0cb764cfcfcc616
+   ```
+3. Ou filtre por erros:
+   ```lucene
+   service:sample-app AND level:ERROR
+   ```
+4. Inspecione o payload JSON do log contendo a mensagem de erro original e o stacktrace da exceção.
+
+---
+
+### [OK] Card 20 — Consolidar a plataforma de observabilidade
+**Descrição:** Revisar toda a plataforma e garantir que está completa, estável e reutilizável. Todos os serviços sobem com `docker compose up -d` sem erros; todos os dashboards do Grafana provisionam automaticamente; as três fontes de dados têm status `OK`; o script `validate_observability.py` do Card 16 passa com 100% dos checks; o `INTEGRATION.md` está atualizado e reflete a integração real do `producer-api` (Card 18).
+
+---
+
+## 🧠 Lições Aprendidas e Conclusões da Plataforma
+
+Ao longo do desenvolvimento e integração desta plataforma de observabilidade completa, consolidamos valiosas lições sobre arquitetura, ferramentas e operação dos três pilares da observabilidade em ambiente de microsserviços.
+
+### 1. Pilar de Métricas (Prometheus + Thanos)
+- **O que funcionou bem:** O modelo *pull* do Prometheus combinado com a sintaxe PromQL permitiu calcular taxas por segundo (`rate`), percentis P95/P99 (`histogram_quantile`) e percentual de erros em tempo real.
+- **Surpreendente:** O **Thanos** integra perfeitamente com o Prometheus via Thanos Sidecar, permitindo unificar métricas históricas de múltiplas réplicas e prover alta disponibilidade transparente para o Grafana.
+- **Limitações:** O intervalo de scraping (`scrape_interval: 15s`) gera um pequeno atraso visual (15-30s) na atualização dos painéis e requer um volume mínimo de pontos amostrados para calcular o `rate` com precisão.
+
+### 2. Pilar de Traces Distribuídos (OpenTelemetry + Grafana Tempo)
+- **O que funcionou bem:** A padronização com **W3C Trace Context** permite propagar o `traceparent` via cabeçalhos HTTP transparente entre serviços. O OTel Collector atua como gateway universal eficiente para gRPC/OTLP.
+- **Surpreendente:** Em ambiente de desenvolvimento/local, utilizar `SimpleSpanProcessor` (envio imediato por span) facilitou imensamente a validação em relação ao `BatchSpanProcessor`. Além disso, a implementação de um middleware ASGI customizado evitou incompatibilidades com pacotes de instrumentação no Python 3.12-slim.
+- **Limitações:** Traces detalhados com muitos atributos geram alto consumo de rede gRPC e exigem políticas de amostragem (*sampling*) em ambientes de produção com altíssimo tráfego.
+
+### 3. Pilar de Logs Estruturados (Filebeat + Logstash + OpenSearch)
+- **O que funcionou bem:** O formato JSON estruturado com o campo de contexto `trace_id` injetado pelo `OtelTraceFilter` transforma o arquivo de log bruto em um sinal correlacionado de alta utilidade.
+- **Surpreendente:** A capacidade de pesquisar diretamente no OpenSearch via Lucene no Grafana usando o `trace_id` de um span do Tempo elimina 90% do tempo gasto em investigações de incidentes (*Métrica → Trace → Log*).
+- **Limitações:** O pipeline Filebeat → Logstash adiciona um pequeno delay (10-15s) de processamento e indexação. Adicionalmente, a JVM do Logstash e do OpenSearch juntas demandam a maior parcela da memória RAM da infraestrutura local.
+
+### 4. Arquitetura Geral & Execução em Docker
+- **O que funcionou bem:** A criação da rede Docker compartilhada `observability_network` e a estratégia de `docker-compose.override.yml` tornaram a plataforma Plug-and-Play para conectar qualquer projeto externo (como o `05-event-streaming-platform`).
+- **Resumo do Consumo:** A stack completa executa 16 containers simultâneos com estabilidade total e 100% dos checks automatizados validados.

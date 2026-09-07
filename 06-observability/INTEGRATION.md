@@ -97,6 +97,8 @@ services:
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=producer-api
+    volumes:
+      - ./logs/producer-api:/logs/producer-api
     networks:
       - default
       - observability_network
@@ -106,3 +108,14 @@ networks:
     external: true
     name: observability_network
 ```
+
+---
+
+## 5. Caso de Uso Real: Integração do `producer-api` (Projeto 05)
+
+A integração real do `05-event-streaming-platform` seguiu os passos abaixo:
+
+1. **Traces (OTel SDK):** Criado `telemetry.py` no `producer-api` com `SimpleSpanProcessor` e middleware ASGI customizado enviando spans gRPC para `otel-collector:4317`.
+2. **Logs (JSON + trace_id):** Criado `logging_config.py` com `OtelTraceFilter` para injeção automática de `trace_id` e `span_id`. Filebeat configurado com volume `/logs/producer-api/*.log`.
+3. **Métricas (Prometheus):** Criado `metrics.py` e instrumentado `order_service.py` com `kafka_events_published_total` e `kafka_publish_duration_seconds`. Job `producer-api` configurado no `prometheus.yml`.
+4. **Dashboard Grafana:** Provisionado o dashboard `project-05-event-streaming` (`event-streaming-dashboard.json`) com visão unificada dos 3 pilares.
