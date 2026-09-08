@@ -6,6 +6,8 @@ from typing import Dict
 
 from fastapi import WebSocket
 
+from app.metrics import record_heartbeat_timeout
+
 logger = logging.getLogger("chat")
 
 PING_INTERVAL = 30
@@ -101,4 +103,5 @@ class ConnectionManager:
 
             for room, username in stale:
                 logger.warning("Heartbeat timeout for %s in room %s", username, room)
+                record_heartbeat_timeout()
                 await self.remove_connection(room, username)

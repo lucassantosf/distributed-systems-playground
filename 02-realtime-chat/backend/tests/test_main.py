@@ -34,6 +34,7 @@ class WebsocketFlowTests(unittest.IsolatedAsyncioTestCase):
         manager.add_connection = AsyncMock()
         manager.remove_connection = AsyncMock()
         manager.get_room_users = AsyncMock(return_value=["Alice"])
+        manager.get_all_rooms = AsyncMock(return_value={"general": ["Alice"]})
         manager.broadcast = AsyncMock()
         manager.broadcast_text = AsyncMock()
 
@@ -63,6 +64,7 @@ class WebsocketFlowTests(unittest.IsolatedAsyncioTestCase):
         manager.add_connection = AsyncMock()
         manager.remove_connection = AsyncMock()
         manager.get_room_users = AsyncMock(return_value=["Alice", "Bob"])
+        manager.get_all_rooms = AsyncMock(return_value={"general": ["Alice", "Bob"]})
         manager.broadcast = AsyncMock()
         manager.broadcast_text = AsyncMock()
 
@@ -89,6 +91,7 @@ class WebsocketFlowTests(unittest.IsolatedAsyncioTestCase):
         manager.add_connection = AsyncMock()
         manager.remove_connection = AsyncMock()
         manager.get_room_users = AsyncMock(return_value=["Alice"])
+        manager.get_all_rooms = AsyncMock(return_value={"general": ["Alice"]})
         manager.broadcast = AsyncMock()
         manager.broadcast_text = AsyncMock()
 
@@ -116,6 +119,7 @@ class WebsocketFlowTests(unittest.IsolatedAsyncioTestCase):
         manager.remove_connection = AsyncMock()
         manager.update_pong = AsyncMock()
         manager.get_room_users = AsyncMock(return_value=["Alice"])
+        manager.get_all_rooms = AsyncMock(return_value={"general": ["Alice"]})
         manager.broadcast = AsyncMock()
         manager.broadcast_text = AsyncMock()
 

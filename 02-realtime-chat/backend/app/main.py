@@ -1,11 +1,25 @@
 import asyncio
 import json
 import logging
+import time
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.infrastructure.database import ensure_schema, test_connection
+from app.metrics import (
+    HTTP_REQUEST_DURATION_SECONDS,
+    HTTP_REQUESTS_TOTAL,
+    record_connection_closed,
+    record_connection_opened,
+    record_heartbeat_timeout,
+    record_message,
+    record_room_seen,
+    set_presence,
+)
 from app.services.connection_manager import ConnectionManager
 from app.services.message_service import MessageService
 from app.services.redis_publisher import RedisPublisher
@@ -22,10 +36,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def record_http_metrics(request: Request, call_next):
+    started_at = time.perf_counter()
+    response = await call_next(request)
+    route = request.scope.get("route")
+    route_name = getattr(route, "path", request.url.path)
+    duration = time.perf_counter() - started_at
+    HTTP_REQUESTS_TOTAL.labels(request.method, route_name, str(response.status_code)).inc()
+    HTTP_REQUEST_DURATION_SECONDS.labels(request.method, route_name).observe(duration)
+    return response
+
+
 manager = ConnectionManager()
 message_service = MessageService()
 redis_publisher = RedisPublisher()
 redis_subscriber = RedisSubscriber(manager)
+
+
+@app.get("/metrics")
+async def metrics() -> Response:
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.on_event("startup")
 async def startup_event() -> None:
@@ -74,6 +107,9 @@ async def get_history(room: str):
 async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
     await websocket.accept()
     await manager.add_connection(room, username, websocket)
+    record_connection_opened()
+    record_room_seen(room)
+    await _update_presence_metrics()
 
     try:
         await websocket.send_text(f"Connected to room: {room}")
@@ -101,7 +137,9 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
             except json.JSONDecodeError:
                 pass
 
+            record_message("received")
             persisted_message = await message_service.persist_message(room=room, username=username, content=message)
+            record_message("persisted")
             await redis_publisher.publish_message(
                 room,
                 {
@@ -111,14 +149,19 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
                     "message_id": persisted_message.id,
                 },
             )
+            record_message("published")
     except WebSocketDisconnect:
         await manager.remove_connection(room, username)
+        record_connection_closed()
+        await _update_presence_metrics()
         logger.info("Client disconnected from room %s", room)
         await _broadcast_updated_users(room)
         await manager.broadcast_text(room, f"System: {username} left")
     except RuntimeError as exc:
         if "disconnect" in str(exc).lower():
             await manager.remove_connection(room, username)
+            record_connection_closed()
+            await _update_presence_metrics()
             logger.info("Client disconnected from room %s", room)
             await _broadcast_updated_users(room)
             await manager.broadcast_text(room, f"System: {username} left")
@@ -126,6 +169,8 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
             raise
     except Exception as exc:
         await manager.remove_connection(room, username)
+        record_connection_closed()
+        await _update_presence_metrics()
         logger.exception("WebSocket error for room %s", room)
         await _broadcast_updated_users(room)
         await manager.broadcast_text(room, f"System: {username} left")
@@ -137,4 +182,12 @@ async def _broadcast_updated_users(room: str) -> None:
     await manager.broadcast_text(
         room,
         f"Active users: {', '.join(room_users)}",
+    )
+
+
+async def _update_presence_metrics() -> None:
+    rooms = await manager.get_all_rooms()
+    set_presence(
+        connections=sum(len(users) for users in rooms.values()),
+        rooms=len(rooms),
     )

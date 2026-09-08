@@ -33,10 +33,14 @@ services:
       dockerfile: Dockerfile
     container_name: chat_backend
     ports:
-      - "8000:8000"
+      - "${CHAT_BACKEND_PORT:-8000}:8000"
     environment:
-      DATABASE_URL: postgresql://chatuser:chatpass@postgres:5432/chatdb
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: ${DATABASE_URL:-postgresql://chatuser:chatpass@postgres:5432/chatdb}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      APP_ENV: ${APP_ENV:-development}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-chat-backend}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      LOG_DIR: ${LOG_DIR:-/logs}
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,7 +49,11 @@ services:
     volumes:
       - ./backend:/app
       - backend_venv:/app/.venv
+      - ./logs:/logs
     command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - default
+      - observability_network
 
   frontend:
     build:
@@ -65,3 +73,8 @@ volumes:
   postgres_data:
   node_modules:
   backend_venv:
+
+networks:
+  observability_network:
+    external: true
+    name: observability_network
