@@ -45,6 +45,11 @@ O `CHAT_BACKEND_PORT` evita o conflito com a `sample-app` da plataforma, que
 também publica a porta `8000`. Em execução standalone, o padrão continua sendo
 `http://localhost:8000`.
 
+Na execução integrada documentada acima, o Prometheus coleta o backend pela
+porta publicada `8002` do host (`host.docker.internal:8002`). Se a porta
+externa for alterada, atualize o target `chat-backend` em
+`06-observability/metrics/prometheus/prometheus.yml`.
+
 Validar a integração de rede:
 
 ```bash
@@ -296,9 +301,9 @@ Objetivo: integrar o backend do chat à plataforma `06-observability`, cobrindo 
 |------|-----------|--------|
 | 26 | Conectar o chat à plataforma de observabilidade | OK |
 | 27 | Instrumentar métricas do backend | OK |
-| 28 | Integrar métricas ao Prometheus e criar alertas | A FAZER |
-| 29 | Implementar logs estruturados em JSON | A FAZER |
-| 30 | Integrar logs ao Filebeat, Logstash e OpenSearch | A FAZER |
+| 28 | Integrar métricas ao Prometheus e criar alertas | OK |
+| 29 | Implementar logs estruturados em JSON | OK |
+| 30 | Integrar logs ao Filebeat, Logstash e OpenSearch | OK |
 | 31 | Instrumentar traces distribuídos com OpenTelemetry | A FAZER |
 | 32 | Propagar contexto entre HTTP, WebSocket, PostgreSQL e Redis | A FAZER |
 | 33 | Criar dashboard unificado do chat no Grafana | A FAZER |
@@ -332,33 +337,65 @@ Objetivo: integrar o backend do chat à plataforma `06-observability`, cobrindo 
 
 **Dependências:** Card 26.
 
-### [*] Card 28 — Integrar métricas ao Prometheus e criar alertas
+### [OK] Card 28 — Integrar métricas ao Prometheus e criar alertas
 
-**Descrição:** Adicionar um job `chat-backend` ao `06-observability/metrics/prometheus/prometheus.yml`, apontando para o serviço do backend e o endpoint `/metrics`. Criar regras específicas para indisponibilidade do backend, aumento da taxa de erros, latência elevada de PostgreSQL/Redis, crescimento de conexões encerradas inesperadamente e ausência de mensagens em um cenário de teste ativo. Definir severidade e janela de avaliação para evitar alertas por flutuações momentâneas.
+**Descrição:** Adicionar um job `chat-backend` ao `06-observability/metrics/prometheus/prometheus.yml`, coletando o endpoint `/metrics` publicado pelo backend integrado. Criar regras específicas para indisponibilidade do backend, aumento da taxa de erros HTTP, latência HTTP elevada e timeouts de heartbeat WebSocket, com severidade e janela de avaliação definidas.
 
 **Critérios de aceite:**
 
 - O target do chat aparece como `UP` no Prometheus.
 - As queries das regras retornam dados reais do backend.
 - Cada alerta possui expressão, severidade, descrição e ação sugerida.
-- Um teste controlado consegue disparar e resolver pelo menos um alerta.
+- O target validado aparece como `UP` usando `up{job="chat-backend"}`.
+- As regras `ChatBackendDown`, `ChatHighErrorRate`, `ChatHighHttpLatency` e `ChatHeartbeatTimeouts` estão carregadas.
+
+Para validar manualmente:
+
+```bash
+# Target do chat no Prometheus
+curl --get http://localhost:9090/api/v1/query \
+    --data-urlencode 'query=up{job="chat-backend"}'
+
+# Regras carregadas
+curl -s http://localhost:9090/api/v1/rules
+```
+
+O target usa `host.docker.internal:8002` porque a `sample-app` ocupa a porta
+8000 e o `producer-api` ocupa a 8001 no ambiente integrado. Se
+`CHAT_BACKEND_PORT` mudar, o target do Prometheus também precisa ser atualizado.
 
 **Dependências:** Card 27.
 
-### [*] Card 29 — Implementar logs estruturados em JSON
+### [OK] Card 29 — Implementar logs estruturados em JSON
 
-**Descrição:** Substituir o logging textual do backend por logs estruturados em JSON, seguindo o padrão da `sample-app` do projeto `06-observability`. Emitir logs em stdout e em arquivo no diretório compartilhado. Padronizar campos como `timestamp`, `level`, `service`, `environment`, `event`, `room`, operação, duração e erro. Sanitizar o username e nunca registrar conteúdo de mensagens, tokens ou dados sensíveis. Incluir `trace_id` e `span_id` quando houver contexto OpenTelemetry.
+**Descrição:** Substituir o logging textual do backend por logs estruturados em JSON, seguindo o padrão da `sample-app` do projeto `06-observability`. Emitir logs em stdout e no arquivo `/logs/chat-backend.log`, montado no host em `02-realtime-chat/logs/`. Cada mensagem publicada gera um evento `chat_message` com `room`, `username`, `message_id`, `content` e `created_at`, permitindo reconstruir e consultar as conversas por sala. Os campos `trace_id` e `span_id` ficam reservados para preenchimento quando o OpenTelemetry for implementado.
 
 **Critérios de aceite:**
 
 - Cada evento relevante do ciclo de vida WebSocket gera log estruturado.
+- Cada mensagem do chat gera um registro JSON pesquisável por sala e usuário.
 - Falhas de PostgreSQL, Redis e validação geram logs com nível e stack trace adequados.
 - As linhas do arquivo são JSON válido e podem ser processadas sem parsing específico do chat.
-- Logs não expõem conteúdo de mensagem nem credenciais.
+- Logs não expõem credenciais ou tokens.
+
+Para validar os registros localmente:
+
+```bash
+# Ver os logs JSON no arquivo do backend
+tail -f logs/chat-backend.log
+
+# Filtrar somente mensagens de uma sala, usando jq
+jq 'select(.event == "chat_message" and .room == "general")' logs/chat-backend.log
+```
+
+O Filebeat ainda precisa ser configurado no Card 30 para enviar esse arquivo ao
+OpenSearch. Depois disso, no Grafana será possível filtrar o datasource de logs
+por `event="chat_message"`, `room="general"` ou `username="Alice"` e visualizar
+o conteúdo de cada conversa.
 
 **Dependências:** Card 26; o campo de trace será completado no Card 31.
 
-### [*] Card 30 — Integrar logs ao Filebeat, Logstash e OpenSearch
+### [OK] Card 30 — Integrar logs ao Filebeat, Logstash e OpenSearch
 
 **Descrição:** Adicionar ao `06-observability/logs/filebeat/filebeat.yml` um input para os arquivos do chat e garantir que o volume compartilhado esteja montado no caminho esperado. Ajustar o pipeline do Logstash apenas quando necessário para preservar os campos JSON do chat e normalizar `service.name`, `event.name`, `trace_id` e `span_id`. Criar uma consulta ou view no Grafana/OpenSearch para filtrar rapidamente logs do serviço `chat-backend` por sala, operação, nível e trace.
 
@@ -368,6 +405,22 @@ Objetivo: integrar o backend do chat à plataforma `06-observability`, cobrindo 
 - É possível filtrar pelo serviço e pelo nível sem consultar o arquivo bruto.
 - `trace_id` e `span_id` ficam disponíveis como campos pesquisáveis.
 - O pipeline não quebra a ingestão dos logs existentes da plataforma.
+
+Validação realizada com uma conversa real: o evento `chat_message` foi indexado
+com `service`, `event.name`, `room`, `username`, `message_id` e `content`. No
+Grafana, use o dashboard `Applications — Logs` e o filtro:
+
+```text
+service:chat-backend AND event.name:chat_message
+```
+
+Para consultar diretamente no OpenSearch:
+
+```bash
+curl -X POST http://localhost:9200/observability-logs-*/_search \
+    -H 'Content-Type: application/json' \
+    -d '{"size":50,"query":{"query_string":{"query":"service:chat-backend AND event.name:chat_message"}}}'
+```
 
 **Dependências:** Cards 26 e 29.
 

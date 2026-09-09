@@ -27,6 +27,17 @@ filebeat.inputs:
       service: producer-api
     fields_under_root: true
 
+  # Projeto 02 — realtime-chat (Card 30)
+  - type: log
+    enabled: true
+    paths:
+      - /logs/chat-backend/*.log
+    close_inactive: 5s
+    fields:
+      env: development
+      service: chat-backend
+    fields_under_root: true
+
 # Envia os eventos para o Logstash (não diretamente ao OpenSearch)
 output.logstash:
   hosts: ["logstash:5044"]

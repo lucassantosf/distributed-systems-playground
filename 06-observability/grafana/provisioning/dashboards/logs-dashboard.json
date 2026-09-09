@@ -13,6 +13,50 @@
   "panels": [
     {
       "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
+      "id": 103,
+      "title": "Conversas do Realtime Chat",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "description": "Mensagens do chat estruturadas por sala, usuário e conteúdo.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 38 },
+      "id": 5,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "dataLinks": [
+          {
+            "field": "trace_id",
+            "title": "Abrir trace no Tempo",
+            "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"refId\":\"A\",\"queryType\":\"traceId\",\"query\":\"${__value.raw}\",\"datasource\":{\"type\":\"tempo\",\"uid\":\"tempo\"}}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+            "targetBlank": true
+          }
+        ]
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "query": "service:chat-backend AND event.name:chat_message",
+          "refId": "A",
+          "timeField": "@timestamp",
+          "metrics": [{ "id": "1", "type": "logs", "settings": { "limit": "500" } }],
+          "bucketAggs": []
+        }
+      ],
+      "title": "Mensagens do Chat (event.name:chat_message)",
+      "type": "logs"
+    },
+    {
+      "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
       "title": "Volume de Logs",
@@ -298,7 +342,7 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Sample App — Logs",
+  "title": "Applications — Logs",
   "uid": "sample-app-logs",
   "version": 1
 }

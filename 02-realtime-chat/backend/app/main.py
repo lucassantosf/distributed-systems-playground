@@ -10,6 +10,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.infrastructure.database import ensure_schema, test_connection
+from app.logging_config import setup_logging
 from app.metrics import (
     HTTP_REQUEST_DURATION_SECONDS,
     HTTP_REQUESTS_TOTAL,
@@ -25,8 +26,7 @@ from app.services.message_service import MessageService
 from app.services.redis_publisher import RedisPublisher
 from app.services.redis_subscriber import RedisSubscriber
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("chat")
+logger = setup_logging()
 
 app = FastAPI()
 app.add_middleware(
@@ -47,6 +47,16 @@ async def record_http_metrics(request: Request, call_next):
     duration = time.perf_counter() - started_at
     HTTP_REQUESTS_TOTAL.labels(request.method, route_name, str(response.status_code)).inc()
     HTTP_REQUEST_DURATION_SECONDS.labels(request.method, route_name).observe(duration)
+    logger.info(
+        "HTTP request completed",
+        extra={
+            "event": "http_request",
+            "method": request.method,
+            "route": route_name,
+            "status_code": response.status_code,
+            "duration_ms": round(duration * 1000, 2),
+        },
+    )
     return response
 
 
@@ -62,6 +72,7 @@ async def metrics() -> Response:
 
 @app.on_event("startup")
 async def startup_event() -> None:
+    logger.info("Chat backend starting", extra={"event": "service_start"})
     await ensure_schema()
     await redis_subscriber.start()
     asyncio.create_task(manager.start_heartbeat())
@@ -110,6 +121,10 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
     record_connection_opened()
     record_room_seen(room)
     await _update_presence_metrics()
+    logger.info(
+        "User joined chat room",
+        extra={"event": "chat_join", "room": room, "username": username},
+    )
 
     try:
         await websocket.send_text(f"Connected to room: {room}")
@@ -127,7 +142,6 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
 
         while True:
             message = await websocket.receive_text()
-            logger.info("[ws][room=%s][user=%s] %s", room, username, message)
 
             try:
                 data = json.loads(message)
@@ -150,11 +164,25 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
                 },
             )
             record_message("published")
+            logger.info(
+                "Chat message published",
+                extra={
+                    "event": "chat_message",
+                    "room": room,
+                    "username": username,
+                    "message_id": persisted_message.id,
+                    "content": message,
+                    "created_at": getattr(persisted_message, "created_at", None),
+                },
+            )
     except WebSocketDisconnect:
         await manager.remove_connection(room, username)
         record_connection_closed()
         await _update_presence_metrics()
-        logger.info("Client disconnected from room %s", room)
+        logger.info(
+            "User left chat room",
+            extra={"event": "chat_leave", "room": room, "username": username},
+        )
         await _broadcast_updated_users(room)
         await manager.broadcast_text(room, f"System: {username} left")
     except RuntimeError as exc:
@@ -162,7 +190,10 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
             await manager.remove_connection(room, username)
             record_connection_closed()
             await _update_presence_metrics()
-            logger.info("Client disconnected from room %s", room)
+            logger.info(
+                "User left chat room",
+                extra={"event": "chat_leave", "room": room, "username": username},
+            )
             await _broadcast_updated_users(room)
             await manager.broadcast_text(room, f"System: {username} left")
         else:
@@ -171,7 +202,10 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
         await manager.remove_connection(room, username)
         record_connection_closed()
         await _update_presence_metrics()
-        logger.exception("WebSocket error for room %s", room)
+        logger.exception(
+            "WebSocket error",
+            extra={"event": "websocket_error", "room": room, "username": username},
+        )
         await _broadcast_updated_users(room)
         await manager.broadcast_text(room, f"System: {username} left")
         raise

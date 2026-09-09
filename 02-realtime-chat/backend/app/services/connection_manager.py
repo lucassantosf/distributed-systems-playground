@@ -48,7 +48,10 @@ class ConnectionManager:
             room_pong = self._last_pong.get(room)
             if room_pong and username in room_pong:
                 room_pong[username] = time.time()
-        logger.info("[heartbeat] pong received from %s in room %s", username, room)
+        logger.info(
+            "Heartbeat pong received",
+            extra={"event": "heartbeat_pong", "room": room, "username": username},
+        )
 
     async def get_room_users(self, room: str) -> list[str]:
         async with self._lock:
@@ -84,7 +87,10 @@ class ConnectionManager:
 
             total_users = sum(len(users) for users in connections.values())
             if total_users > 0:
-                logger.info("[heartbeat] sending ping to %d user(s)", total_users)
+                logger.info(
+                    "Heartbeat ping sent",
+                    extra={"event": "heartbeat_ping", "active_connections": total_users},
+                )
 
             for room, users in connections.items():
                 for username, websocket in users.items():
@@ -102,6 +108,9 @@ class ConnectionManager:
                             stale.append((room, username))
 
             for room, username in stale:
-                logger.warning("Heartbeat timeout for %s in room %s", username, room)
+                logger.warning(
+                    "Heartbeat timeout",
+                    extra={"event": "heartbeat_timeout", "room": room, "username": username},
+                )
                 record_heartbeat_timeout()
                 await self.remove_connection(room, username)

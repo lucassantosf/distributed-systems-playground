@@ -34,6 +34,10 @@ services:
     image: prom/prometheus:v2.53.0
     container_name: prometheus
     restart: unless-stopped
+    extra_hosts:
+      # O backend do Projeto 02 publica suas métricas no host em 8002 quando
+      # executado junto com a sample-app (que usa a porta 8000).
+      - "host.docker.internal:host-gateway"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -214,6 +218,7 @@ services:
       - ./logs/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
       - ./apps/sample-app/logs:/logs/sample-app:ro    # Card 9: sample-app
       - ./apps/producer-api/logs:/logs/producer-api:ro # Card 18.2: producer-api
+      - ../02-realtime-chat/logs:/logs/chat-backend:ro # Card 30: realtime-chat
     depends_on:
       logstash:
         condition: service_healthy

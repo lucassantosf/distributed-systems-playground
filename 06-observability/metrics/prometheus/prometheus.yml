@@ -43,3 +43,11 @@ scrape_configs:
   - job_name: "producer-api"
     static_configs:
       - targets: ["producer-api:8000"]
+
+  # ------------------------------------------------------------------
+  # Card 28 — Backend do realtime-chat (Projeto 02)
+  # ------------------------------------------------------------------
+  - job_name: "chat-backend"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8002"]
