@@ -69,7 +69,7 @@ Tela principal do chat. Responsável por:
 
 A conexão é gerenciada dentro de `Chat.tsx` via `useEffect`:
 
-1. **Conexão**: `ws://{host}:8000/ws/{room}/{username}`
+1. **Conexão**: `ws://{host}:{VITE_BACKEND_PORT}/ws/{room}/{username}` (8000 por padrão)
 2. **Mensagens recebidas**:
    - `Active users: ...` → atualiza lista de online
    - `{"type": "ping"}` → responde com `{"type": "pong"}`

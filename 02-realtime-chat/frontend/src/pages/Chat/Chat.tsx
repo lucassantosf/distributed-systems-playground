@@ -7,6 +7,7 @@ import { Button } from '../../components/Button/Button';
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const RECONNECT_DELAY = 3_000;
+const BACKEND_PORT = import.meta.env.VITE_BACKEND_PORT ?? '8000';
 
 export const Chat: React.FC = () => {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export const Chat: React.FC = () => {
   const connectSocket = useCallback(() => {
     reconnectingRef.current = false;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${protocol}//${window.location.hostname}:8000/ws/${encodeURIComponent(decodedRoom)}/${encodeURIComponent(decodedUsername)}`);
+    const socket = new WebSocket(`${protocol}//${window.location.hostname}:${BACKEND_PORT}/ws/${encodeURIComponent(decodedRoom)}/${encodeURIComponent(decodedUsername)}`);
     socketRef.current = socket;
 
     if (reconnectAttemptsRef.current > 0) {
@@ -70,7 +71,7 @@ export const Chat: React.FC = () => {
         const users = messageText
           .replace('Active users:', '')
           .split(',')
-          .map((user) => user.trim())
+          .map((user: string) => user.trim())
           .filter(Boolean);
         setActiveUsers(users);
         return;
@@ -134,7 +135,7 @@ export const Chat: React.FC = () => {
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:8000/history/${encodeURIComponent(decodedRoom)}`);
+        const response = await fetch(`http://${window.location.hostname}:${BACKEND_PORT}/history/${encodeURIComponent(decodedRoom)}`);
         if (!response.ok) {
           return;
         }

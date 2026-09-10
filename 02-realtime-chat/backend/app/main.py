@@ -11,6 +11,7 @@ from starlette.responses import Response
 
 from app.infrastructure.database import ensure_schema, test_connection
 from app.logging_config import setup_logging
+from app.telemetry import get_tracer, setup_tracing
 from app.metrics import (
     HTTP_REQUEST_DURATION_SECONDS,
     HTTP_REQUESTS_TOTAL,
@@ -27,8 +28,10 @@ from app.services.redis_publisher import RedisPublisher
 from app.services.redis_subscriber import RedisSubscriber
 
 logger = setup_logging()
+tracer = get_tracer()
 
-app = FastAPI()
+app = FastAPI(title="Realtime Chat", version="1.0.0")
+setup_tracing(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -116,77 +119,79 @@ async def get_history(room: str):
 
 @app.websocket("/ws/{room}/{username}")
 async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
-    await websocket.accept()
-    await manager.add_connection(room, username, websocket)
-    record_connection_opened()
-    record_room_seen(room)
-    await _update_presence_metrics()
-    logger.info(
-        "User joined chat room",
-        extra={"event": "chat_join", "room": room, "username": username},
-    )
+    with tracer.start_as_current_span("chat.websocket_session") as span:
+        span.set_attribute("chat.room", room)
+        span.set_attribute("chat.username", username)
+        span.set_attribute("messaging.system", "websocket")
 
-    try:
-        await websocket.send_text(f"Connected to room: {room}")
-
-        room_users = await manager.get_room_users(room)
-        await websocket.send_text(f"Active users: {', '.join(room_users)}")
-
-        await manager.broadcast_text(
-            room,
-            f"Active users: {', '.join(room_users)}",
-            exclude_username=username,
-        )
-
-        await manager.broadcast_text(room, f"System: {username} joined")
-
-        while True:
-            message = await websocket.receive_text()
-
-            try:
-                data = json.loads(message)
-                if data.get("type") == "pong":
-                    await manager.update_pong(room, username)
-                    continue
-            except json.JSONDecodeError:
-                pass
-
-            record_message("received")
-            persisted_message = await message_service.persist_message(room=room, username=username, content=message)
-            record_message("persisted")
-            await redis_publisher.publish_message(
-                room,
-                {
-                    "room": room,
-                    "username": username,
-                    "content": message,
-                    "message_id": persisted_message.id,
-                },
-            )
-            record_message("published")
-            logger.info(
-                "Chat message published",
-                extra={
-                    "event": "chat_message",
-                    "room": room,
-                    "username": username,
-                    "message_id": persisted_message.id,
-                    "content": message,
-                    "created_at": getattr(persisted_message, "created_at", None),
-                },
-            )
-    except WebSocketDisconnect:
-        await manager.remove_connection(room, username)
-        record_connection_closed()
+        await websocket.accept()
+        await manager.add_connection(room, username, websocket)
+        record_connection_opened()
+        record_room_seen(room)
         await _update_presence_metrics()
         logger.info(
-            "User left chat room",
-            extra={"event": "chat_leave", "room": room, "username": username},
+            "User joined chat room",
+            extra={"event": "chat_join", "room": room, "username": username},
         )
-        await _broadcast_updated_users(room)
-        await manager.broadcast_text(room, f"System: {username} left")
-    except RuntimeError as exc:
-        if "disconnect" in str(exc).lower():
+
+        try:
+            await websocket.send_text(f"Connected to room: {room}")
+
+            room_users = await manager.get_room_users(room)
+            await websocket.send_text(f"Active users: {', '.join(room_users)}")
+
+            await manager.broadcast_text(
+                room,
+                f"Active users: {', '.join(room_users)}",
+                exclude_username=username,
+            )
+
+            await manager.broadcast_text(room, f"System: {username} joined")
+
+            while True:
+                message = await websocket.receive_text()
+
+                try:
+                    data = json.loads(message)
+                    if data.get("type") == "pong":
+                        with tracer.start_as_current_span("chat.websocket_pong") as pong_span:
+                            pong_span.set_attribute("chat.room", room)
+                            pong_span.set_attribute("chat.username", username)
+                            await manager.update_pong(room, username)
+                        continue
+                except json.JSONDecodeError:
+                    pass
+
+                record_message("received")
+                with tracer.start_as_current_span("chat.message_publish") as msg_span:
+                    msg_span.set_attribute("chat.room", room)
+                    msg_span.set_attribute("chat.username", username)
+                    msg_span.set_attribute("chat.message_length", len(message))
+                    persisted_message = await message_service.persist_message(room=room, username=username, content=message)
+                    msg_span.set_attribute("chat.message_id", str(getattr(persisted_message, "id", "unknown")))
+                    record_message("persisted")
+                    await redis_publisher.publish_message(
+                        room,
+                        {
+                            "room": room,
+                            "username": username,
+                            "content": message,
+                            "message_id": persisted_message.id,
+                        },
+                    )
+                    record_message("published")
+                logger.info(
+                    "Chat message published",
+                    extra={
+                        "event": "chat_message",
+                        "room": room,
+                        "username": username,
+                        "message_id": persisted_message.id,
+                        "content": message,
+                        "created_at": getattr(persisted_message, "created_at", None),
+                    },
+                )
+        except WebSocketDisconnect:
             await manager.remove_connection(room, username)
             record_connection_closed()
             await _update_presence_metrics()
@@ -196,19 +201,32 @@ async def websocket_endpoint(websocket: WebSocket, room: str, username: str):
             )
             await _broadcast_updated_users(room)
             await manager.broadcast_text(room, f"System: {username} left")
-        else:
+        except RuntimeError as exc:
+            if "disconnect" in str(exc).lower():
+                await manager.remove_connection(room, username)
+                record_connection_closed()
+                await _update_presence_metrics()
+                logger.info(
+                    "User left chat room",
+                    extra={"event": "chat_leave", "room": room, "username": username},
+                )
+                await _broadcast_updated_users(room)
+                await manager.broadcast_text(room, f"System: {username} left")
+            else:
+                span.record_exception(exc)
+                raise
+        except Exception as exc:
+            span.record_exception(exc)
+            await manager.remove_connection(room, username)
+            record_connection_closed()
+            await _update_presence_metrics()
+            logger.exception(
+                "WebSocket error",
+                extra={"event": "websocket_error", "room": room, "username": username},
+            )
+            await _broadcast_updated_users(room)
+            await manager.broadcast_text(room, f"System: {username} left")
             raise
-    except Exception as exc:
-        await manager.remove_connection(room, username)
-        record_connection_closed()
-        await _update_presence_metrics()
-        logger.exception(
-            "WebSocket error",
-            extra={"event": "websocket_error", "room": room, "username": username},
-        )
-        await _broadcast_updated_users(room)
-        await manager.broadcast_text(room, f"System: {username} left")
-        raise
 
 
 async def _broadcast_updated_users(room: str) -> None:

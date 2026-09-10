@@ -1,0 +1,500 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" },
+    { "type": "datasource", "id": "grafana-opensearch-datasource", "name": "OpenSearch", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "Dashboard unificado do realtime chat com métricas do backend, sinais de saúde e logs do serviço chat-backend.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Visão Geral do Chat",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Disponibilidade do backend: 1 = serviço saudável.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "up{job=\"chat-backend\"}",
+          "legendFormat": "UP",
+          "refId": "A"
+        }
+      ],
+      "title": "Backend disponível",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Número de conexões WebSocket ativas no momento.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "chat_active_connections{job=\"chat-backend\"}",
+          "legendFormat": "Conexões ativas",
+          "refId": "A"
+        }
+      ],
+      "title": "Usuários online agora",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Número de salas com pelo menos uma conexão ativa.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "chat_active_rooms{job=\"chat-backend\"}",
+          "legendFormat": "Salas ativas",
+          "refId": "A"
+        }
+      ],
+      "title": "Salas abertas agora",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Mensagens publicadas no Redis e processadas pelo backend nas últimas janelas.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "sum(rate(chat_messages_total{job=\"chat-backend\"}[5m]))",
+          "legendFormat": "Mensagens/s",
+          "refId": "A"
+        }
+      ],
+      "title": "Mensagens/s",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Timeouts de heartbeat no período atual.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "increase(chat_heartbeat_timeouts_total{job=\"chat-backend\"}[1h])",
+          "legendFormat": "HF timeouts",
+          "refId": "A"
+        }
+      ],
+      "title": "Heartbeat timeouts (1h)",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "Operações e Saúde",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Taxa de requisições HTTP por segundo observadas no backend do chat.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "req/s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "sum(rate(chat_http_requests_total{job=\"chat-backend\"}[5m]))",
+          "legendFormat": "Req/s total",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests por segundo (HTTP)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Latência HTTP P95 do backend do chat.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "latência",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "id": 7,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(chat_http_request_duration_seconds_bucket{job=\"chat-backend\"}[5m])))",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ],
+      "title": "Latência HTTP P95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Taxa de mensagens recebidas + persistidas + publicadas em todas as salas do chat.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "mensagens/s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "id": 8,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "sum(rate(chat_messages_total{job=\"chat-backend\"}[5m]))",
+          "legendFormat": "Total mensagens/s",
+          "refId": "A"
+        }
+      ],
+      "title": "Mensagens processadas por segundo",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "thanos" },
+      "description": "Contagem de timeouts de heartbeat por janela de avaliação.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "timeouts",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": { "type": "linear" },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "id": 9,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "thanos" },
+          "expr": "increase(chat_heartbeat_timeouts_total{job=\"chat-backend\"}[10m])",
+          "legendFormat": "Timeouts",
+          "refId": "A"
+        }
+      ],
+      "title": "Heartbeat timeouts por janela",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "id": 102,
+      "title": "Logs do Chat",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "description": "Mensagens do chat com a conversa e o trace_id para correlação com Tempo.",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 23 },
+      "id": 10,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "dataLinks": [
+          {
+            "field": "trace_id",
+            "title": "Abrir trace no Tempo",
+            "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"refId\":\"A\",\"queryType\":\"traceId\",\"query\":\"${__value.raw}\",\"datasource\":{\"type\":\"tempo\",\"uid\":\"tempo\"}}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+            "targetBlank": true
+          }
+        ]
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "query": "service:chat-backend AND event.name:chat_message",
+          "refId": "A",
+          "timeField": "@timestamp",
+          "metrics": [{ "id": "1", "type": "logs", "settings": { "limit": "200" } }],
+          "bucketAggs": []
+        }
+      ],
+      "title": "Mensagens do chat (event.name:chat_message)",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+      "description": "Logs de erro do backend com correlação por trace_id.",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 23 },
+      "id": 11,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "dataLinks": [
+          {
+            "field": "trace_id",
+            "title": "Abrir trace no Tempo",
+            "url": "/explore?orgId=1&left={\"datasource\":\"tempo\",\"queries\":[{\"refId\":\"A\",\"queryType\":\"traceId\",\"query\":\"${__value.raw}\",\"datasource\":{\"type\":\"tempo\",\"uid\":\"tempo\"}}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+            "targetBlank": true
+          }
+        ]
+      },
+      "pluginVersion": "11.1.0",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-opensearch-datasource", "uid": "opensearch" },
+          "query": "service:chat-backend AND level:ERROR",
+          "refId": "A",
+          "timeField": "@timestamp",
+          "metrics": [{ "id": "1", "type": "logs", "settings": { "limit": "200" } }],
+          "bucketAggs": []
+        }
+      ],
+      "title": "Erros do backend (service:chat-backend AND level:ERROR)",
+      "type": "logs"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["observability", "chat", "realtime-chat", "metrics", "logs"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Realtime Chat — Overview",
+  "uid": "realtime-chat-overview",
+  "version": 1
+}

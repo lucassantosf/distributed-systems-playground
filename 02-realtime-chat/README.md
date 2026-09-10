@@ -46,9 +46,9 @@ também publica a porta `8000`. Em execução standalone, o padrão continua sen
 `http://localhost:8000`.
 
 Na execução integrada documentada acima, o Prometheus coleta o backend pela
-porta publicada `8002` do host (`host.docker.internal:8002`). Se a porta
-externa for alterada, atualize o target `chat-backend` em
-`06-observability/metrics/prometheus/prometheus.yml`.
+rede Docker compartilhada, usando o alias `chat-backend:8000`. Portanto, a
+porta publicada no host (`CHAT_BACKEND_PORT`) pode ser alterada para acesso do
+navegador sem exigir qualquer alteração na configuração do Prometheus.
 
 Validar a integração de rede:
 
@@ -65,18 +65,18 @@ Aguardar até todos os serviços estarem prontos. Você verá no terminal:
 | Serviço | URL |
 |---------|-----|
 | Frontend | http://localhost:5173 |
-| Backend API | http://localhost:8000 |
+| Backend API | http://localhost:${CHAT_BACKEND_PORT:-8000} |
 | PostgreSQL | localhost:5432 |
 | Redis | localhost:6379 |
 
 ### Verificar se está rodando
 
 ```bash
-# Testar o backend
-curl http://localhost:8000/
+# Testar o backend (use 8002 quando a observability estiver ativa)
+curl http://localhost:${CHAT_BACKEND_PORT:-8000}/
 
 # Ver todas as métricas Prometheus (use 8002 quando a observability estiver ativa)
-curl http://localhost:8000/metrics
+curl http://localhost:${CHAT_BACKEND_PORT:-8000}/metrics
 
 # Ver logs em tempo real
 docker compose logs -f
@@ -304,9 +304,9 @@ Objetivo: integrar o backend do chat à plataforma `06-observability`, cobrindo 
 | 28 | Integrar métricas ao Prometheus e criar alertas | OK |
 | 29 | Implementar logs estruturados em JSON | OK |
 | 30 | Integrar logs ao Filebeat, Logstash e OpenSearch | OK |
-| 31 | Instrumentar traces distribuídos com OpenTelemetry | A FAZER |
-| 32 | Propagar contexto entre HTTP, WebSocket, PostgreSQL e Redis | A FAZER |
-| 33 | Criar dashboard unificado do chat no Grafana | A FAZER |
+| 31 | Instrumentar traces distribuídos com OpenTelemetry | OK |
+| 32 | Propagar contexto entre HTTP, WebSocket, PostgreSQL e Redis | OK |
+| 33 | Criar dashboard unificado do chat no Grafana | OK |
 | 34 | Validar correlação entre métricas, logs e traces | A FAZER |
 
 ---
@@ -360,9 +360,9 @@ curl --get http://localhost:9090/api/v1/query \
 curl -s http://localhost:9090/api/v1/rules
 ```
 
-O target usa `host.docker.internal:8002` porque a `sample-app` ocupa a porta
-8000 e o `producer-api` ocupa a 8001 no ambiente integrado. Se
-`CHAT_BACKEND_PORT` mudar, o target do Prometheus também precisa ser atualizado.
+O target usa `chat-backend:8000`, o alias e a porta interna do backend na rede
+compartilhada. A configuração não depende de `CHAT_BACKEND_PORT` nem de portas
+ocupadas no host.
 
 **Dependências:** Card 27.
 
@@ -424,7 +424,7 @@ curl -X POST http://localhost:9200/observability-logs-*/_search \
 
 **Dependências:** Cards 26 e 29.
 
-### [*] Card 31 — Instrumentar traces distribuídos com OpenTelemetry
+### [OK] Card 31 — Instrumentar traces distribuídos com OpenTelemetry
 
 **Descrição:** Adicionar as dependências OpenTelemetry ao backend e configurar um `TracerProvider` com exportação OTLP via gRPC para `otel-collector:4317`, usando `service.name=chat-backend`. Instrumentar automaticamente as rotas HTTP e criar spans manuais para conexão/desconexão WebSocket, carregamento de histórico, persistência no PostgreSQL, publicação/consumo no Redis e broadcast para a sala. Registrar atributos técnicos úteis, sem incluir conteúdo da mensagem ou dados sensíveis.
 
@@ -437,7 +437,7 @@ curl -X POST http://localhost:9200/observability-logs-*/_search \
 
 **Dependências:** Card 26.
 
-### [*] Card 32 — Propagar contexto entre HTTP, WebSocket, PostgreSQL e Redis
+### [OK] Card 32 — Propagar contexto entre HTTP, WebSocket, PostgreSQL e Redis
 
 **Descrição:** Definir como o contexto de tracing será mantido durante o ciclo de vida de uma conexão WebSocket e entre tarefas assíncronas. Garantir que spans de banco e Redis sejam filhos do span da operação da mensagem, e que logs emitidos dentro dessas operações recebam os mesmos `trace_id` e `span_id`. Validar especialmente o caminho assíncrono do subscriber Redis até o broadcast WebSocket.
 
@@ -450,7 +450,7 @@ curl -X POST http://localhost:9200/observability-logs-*/_search \
 
 **Dependências:** Cards 29 e 31.
 
-### [*] Card 33 — Criar dashboard unificado do chat no Grafana
+### [OK] Card 33 — Criar dashboard unificado do chat no Grafana
 
 **Descrição:** Provisionar um dashboard específico para `chat-backend`, reutilizando o modelo de dashboards do `06-observability`. Exibir disponibilidade, conexões ativas, usuários e salas, taxa de mensagens, erros, latência de PostgreSQL/Redis, conexões encerradas e atividade de heartbeat. Adicionar links de dados para navegar de métricas para traces e de traces para logs no OpenSearch.
 
@@ -462,6 +462,10 @@ curl -X POST http://localhost:9200/observability-logs-*/_search \
 - Os data links abrem o trace e os logs correspondentes quando os IDs existem.
 
 **Dependências:** Cards 28, 30 e 32.
+
+Validação concluída no Grafana: o dashboard foi carregado automaticamente e os
+painéis de disponibilidade, conexões, salas, mensagens, latência, heartbeat e
+logs do `chat-backend` exibiram dados da execução integrada.
 
 ### [*] Card 34 — Validar correlação entre métricas, logs e traces
 

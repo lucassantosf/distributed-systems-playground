@@ -6,11 +6,22 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
+from opentelemetry import trace
+
 
 SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "chat-backend")
 APP_ENV = os.getenv("APP_ENV", "development")
 LOG_DIR = os.getenv("LOG_DIR", "logs")
 LOG_FILE = os.path.join(LOG_DIR, "chat-backend.log")
+
+
+class TraceContextFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        current_span = trace.get_current_span()
+        span_context = current_span.get_span_context()
+        record.trace_id = format(span_context.trace_id, "032x") if span_context and span_context.is_valid else ""
+        record.span_id = format(span_context.span_id, "016x") if span_context and span_context.is_valid else ""
+        return True
 
 
 class JsonFormatter(logging.Formatter):
@@ -50,6 +61,7 @@ def setup_logging() -> logging.Logger:
 
     logger.setLevel(logging.INFO)
     formatter = JsonFormatter()
+    trace_filter = TraceContextFilter()
 
     file_handler = logging.handlers.RotatingFileHandler(
         LOG_FILE,
@@ -58,10 +70,12 @@ def setup_logging() -> logging.Logger:
         encoding="utf-8",
     )
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(trace_filter)
     file_handler.setLevel(logging.INFO)
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(trace_filter)
     console_handler.setLevel(logging.INFO)
 
     logger.addHandler(file_handler)

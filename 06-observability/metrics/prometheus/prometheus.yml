@@ -50,4 +50,6 @@ scrape_configs:
   - job_name: "chat-backend"
     metrics_path: "/metrics"
     static_configs:
-      - targets: ["host.docker.internal:8002"]
+      # O backend e o Prometheus compartilham a observability_network. Use o
+      # alias Docker e a porta interna para nao depender da porta publicada no host.
+      - targets: ["chat-backend:8000"]

@@ -3,6 +3,9 @@ import os
 
 import redis.asyncio as redis
 
+from app.telemetry import inject_context_into_payload
+
+
 class RedisPublisher:
     def __init__(self, redis_url: str | None = None) -> None:
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://redis:6379")
@@ -10,4 +13,5 @@ class RedisPublisher:
 
     async def publish_message(self, room: str, payload: dict) -> None:
         channel = f"chat:{room}"
-        await self.client.publish(channel, json.dumps(payload))
+        payload_with_context = inject_context_into_payload(payload)
+        await self.client.publish(channel, json.dumps(payload_with_context))

@@ -35,8 +35,8 @@ services:
     container_name: prometheus
     restart: unless-stopped
     extra_hosts:
-      # O backend do Projeto 02 publica suas métricas no host em 8002 quando
-      # executado junto com a sample-app (que usa a porta 8000).
+      # Mantido para outros serviços que ainda precisem acessar o host.
+      # O chat-backend e raspado pelo alias Docker na observability_network.
       - "host.docker.internal:host-gateway"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -302,30 +302,30 @@ services:
   # Card 6 — Aplicação de exemplo (Epic 2)
   # ============================================================
 
-  sample-app:
-    build:
-      context: ./apps/sample-app
-      dockerfile: Dockerfile
-    image: sample-app:local
-    container_name: sample-app
-    restart: unless-stopped
-    environment:
-      - APP_NAME=sample-app
-      - APP_ENV=development
-      - LOG_DIR=/logs
-      # Card 8: OTel Collector endpoint para envio de traces
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-    volumes:
-      # Logs ficam em apps/sample-app/logs/ — co-localizados com a aplicação
-      # Filebeat monitora esse diretório e envia para OpenSearch via Logstash
-      - ./apps/sample-app/logs:/logs
-    ports:
-      - "8000:8000"
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    networks:
-      - observability_network
+  # sample-app:
+  #   build:
+  #     context: ./apps/sample-app
+  #     dockerfile: Dockerfile
+  #   image: sample-app:local
+  #   container_name: sample-app
+  #   restart: unless-stopped
+  #   environment:
+  #     - APP_NAME=sample-app
+  #     - APP_ENV=development
+  #     - LOG_DIR=/logs
+  #     # Card 8: OTel Collector endpoint para envio de traces
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+  #   volumes:
+  #     # Logs ficam em apps/sample-app/logs/ — co-localizados com a aplicação
+  #     # Filebeat monitora esse diretório e envia para OpenSearch via Logstash
+  #     - ./apps/sample-app/logs:/logs
+  #   ports:
+  #     - "8000:8000"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 15s
+  #   networks:
+  #     - observability_network
