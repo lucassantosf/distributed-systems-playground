@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+
+# Environment
+.env
+
+# Logs
+logs/
+*.log
+
+# Node / React
+node_modules/
+dist/
+.vite/
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
