@@ -203,19 +203,69 @@ Nenhum dos três serviços individualmente retornaria isso — é o BFF que comp
 
 ---
 
-# [*] Epic 1 — Fundação
+# [OK] Epic 1 — Fundação
 
 ## [OK] Card 1 — Criar estrutura inicial do projeto
 
 Descrição: Criar a estrutura de diretórios definida em Estrutura do Projeto: `bff/`, `services/user-service/`, `services/product-service/`, `services/order-service/`, `frontend/`, `.env.example`, `.gitignore` e `docker-compose.yml` vazio. O objetivo é ter uma base limpa e organizada antes de qualquer serviço ser implementado.
 
-## [*] Card 2 — Configurar ambiente Docker
+## [OK] Card 2 — Configurar ambiente Docker
 
 Descrição: Configurar o `docker-compose.yml` com os quatro containers de backend: `bff`, `user-service`, `product-service` e `order-service`. Cada serviço deve ter seu `Dockerfile` e expor um endpoint `GET /health` retornando `{"status": "ok"}`. Ao final, todos os containers sobem com `docker compose up --build` sem erros.
 
-## [*] Card 3 — Validar comunicação entre containers
+Nenhum serviço usa `restart: always` ou `restart: unless-stopped`. O comportamento padrão do Docker (`restart: no`) garante que os containers **não sobem automaticamente** ao ligar ou reiniciar o sistema operacional — é necessário um `docker compose up` explícito.
+
+Validação:
+
+```bash
+docker compose up --build -d
+
+curl http://localhost:8000/health  # {"status":"ok","service":"bff"}
+curl http://localhost:8001/health  # {"status":"ok","service":"user-service"}
+curl http://localhost:8002/health  # {"status":"ok","service":"product-service"}
+curl http://localhost:8003/health  # {"status":"ok","service":"order-service"}
+
+docker compose down
+```
+
+## [OK] Card 3 — Validar comunicação entre containers
 
 Descrição: Garantir que o BFF consegue alcançar os três serviços downstream pela rede interna do Docker. Configurar as URLs dos serviços no `config.py` do BFF via variáveis de ambiente (`.env`). Validar chamando o health de cada serviço a partir do container do BFF.
+
+O `config.py` usa `pydantic-settings` para ler as URLs dos serviços e o timeout via variáveis de ambiente, com defaults que correspondem aos nomes dos containers no Docker Compose.
+
+O endpoint `GET /health/downstream` do BFF chama o `/health` de cada serviço via `httpx` e retorna um status composto:
+
+- `"status": "ok"` — todos os serviços responderam corretamente.
+- `"status": "degraded"` — um ou mais serviços estão inacessíveis.
+
+Validação com todos os serviços no ar:
+
+```bash
+curl http://localhost:8000/health/downstream
+# {
+#   "status": "ok",
+#   "downstream": {
+#     "user-service":    {"status": "ok", "http_status": 200},
+#     "product-service": {"status": "ok", "http_status": 200},
+#     "order-service":   {"status": "ok", "http_status": 200}
+#   }
+# }
+```
+
+Validação com `user-service` derrubado (`docker compose stop user-service`):
+
+```bash
+curl http://localhost:8000/health/downstream
+# {
+#   "status": "degraded",
+#   "downstream": {
+#     "user-service":    {"status": "error", "detail": "..."},
+#     "product-service": {"status": "ok", "http_status": 200},
+#     "order-service":   {"status": "ok", "http_status": 200}
+#   }
+# }
+```
 
 ---
 
