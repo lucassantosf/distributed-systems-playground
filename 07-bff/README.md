@@ -269,21 +269,21 @@ curl http://localhost:8000/health/downstream
 
 ---
 
-# [*] Epic 2 — Serviços Downstream
+# [OK] Epic 2 — Serviços Downstream
 
-## [*] Card 4 — Implementar user-service
+## [OK] Card 4 — Implementar user-service
 
 Descrição: Criar o `user-service` com dados em memória (lista Python). Expor os endpoints `GET /users` (lista todos) e `GET /users/{id}` (busca por id). Retornar 404 quando o usuário não existir. Dados de exemplo: 3 a 5 usuários com `id`, `name` e `email`.
 
-## [*] Card 5 — Implementar product-service
+## [OK] Card 5 — Implementar product-service
 
 Descrição: Criar o `product-service` com dados em memória. Expor os endpoints `GET /products` (lista todos) e `GET /products/{id}` (busca por id). Retornar 404 quando o produto não existir. Dados de exemplo: 5 a 10 produtos com `id`, `name`, `price` e `stock`.
 
-## [*] Card 6 — Implementar order-service
+## [OK] Card 6 — Implementar order-service
 
 Descrição: Criar o `order-service` com dados em memória. Expor os endpoints `GET /orders` (lista todos) e `GET /orders/{id}` (busca por id). Cada pedido deve conter `id`, `user_id`, `status` (`pending`, `confirmed`, `shipped`, `delivered`), `total` e `items` (lista com `product_id` e `quantity`). Retornar 404 quando o pedido não existir.
 
-## [*] Card 7 — Validar os três serviços
+## [OK] Card 7 — Validar os três serviços
 
 Descrição: Subir os três serviços via Docker Compose e validar todos os endpoints com `curl`. Confirmar que dados de exemplo estão populados corretamente e que os retornos 404 funcionam. Criar um script `scripts/validate_services.sh` com as chamadas de validação.
 

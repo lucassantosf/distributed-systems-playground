@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 
+from app.routers import products
+
 app = FastAPI(title="Product Service", version="0.1.0")
+
+app.include_router(products.router)
 
 
 @app.get("/health")
