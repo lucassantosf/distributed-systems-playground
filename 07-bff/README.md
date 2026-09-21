@@ -291,11 +291,11 @@ Descrição: Subir os três serviços via Docker Compose e validar todos os endp
 
 # [*] Epic 3 — BFF: API Composition
 
-## [*] Card 8 — Criar estrutura base do BFF
+## [OK] Card 8 — Criar estrutura base do BFF
 
 Descrição: Implementar a estrutura do BFF com FastAPI: `main.py`, `config.py` (URLs dos serviços via env), e a camada `clients/` com um cliente HTTP para cada serviço downstream usando `httpx`. Cada cliente deve ter um método de busca por id e um de listagem. Ao final, o BFF sobe no Docker Compose e seu `GET /health` responde corretamente.
 
-## [*] Card 9 — Implementar GET /bff/orders/{id} — composição completa
+## [OK] Card 9 — Implementar GET /bff/orders/{id} — composição completa
 
 Descrição: Implementar o endpoint principal do BFF. Dado um `order_id`, o BFF deve: (1) buscar o pedido no `order-service`; (2) buscar o cliente no `user-service` usando o `user_id` do pedido; (3) buscar os detalhes de cada produto no `product-service` usando os `product_id` dos itens; (4) agregar tudo em uma única resposta com o schema `OrderDetail`. Esse é o coração do padrão BFF — uma chamada do cliente, três chamadas internas.
 

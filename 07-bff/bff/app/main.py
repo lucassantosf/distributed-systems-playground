@@ -2,8 +2,11 @@ import httpx
 from fastapi import FastAPI
 
 from app.config import settings
+from app.routers import orders
 
 app = FastAPI(title="BFF", version="0.1.0")
+
+app.include_router(orders.router)
 
 
 @app.get("/health")
