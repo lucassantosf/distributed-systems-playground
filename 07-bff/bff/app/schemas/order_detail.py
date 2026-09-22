@@ -19,3 +19,14 @@ class OrderDetail(BaseModel):
     total: float
     customer: CustomerInfo
     items: list[OrderItemDetail]
+    is_degraded: bool = False
+
+
+class OrderSummary(BaseModel):
+    order_id: int
+    user_id: int
+    customer_name: str
+    status: str
+    total: float
+    items_count: int
+    is_degraded: bool = False

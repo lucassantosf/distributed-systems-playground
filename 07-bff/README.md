@@ -289,7 +289,7 @@ Descrição: Subir os três serviços via Docker Compose e validar todos os endp
 
 ---
 
-# [*] Epic 3 — BFF: API Composition
+# [OK] Epic 3 — BFF: API Composition
 
 ## [OK] Card 8 — Criar estrutura base do BFF
 
@@ -299,27 +299,27 @@ Descrição: Implementar a estrutura do BFF com FastAPI: `main.py`, `config.py` 
 
 Descrição: Implementar o endpoint principal do BFF. Dado um `order_id`, o BFF deve: (1) buscar o pedido no `order-service`; (2) buscar o cliente no `user-service` usando o `user_id` do pedido; (3) buscar os detalhes de cada produto no `product-service` usando os `product_id` dos itens; (4) agregar tudo em uma única resposta com o schema `OrderDetail`. Esse é o coração do padrão BFF — uma chamada do cliente, três chamadas internas.
 
-## [*] Card 10 — Implementar GET /bff/orders — listagem composta
+## [OK] Card 10 — Implementar GET /bff/orders — listagem composta
 
 Descrição: Implementar o endpoint de listagem no BFF. Para cada pedido retornado pelo `order-service`, o BFF deve enriquecer a resposta com o nome do cliente (via `user-service`). O objetivo é mostrar que a composição também se aplica a listagens, não apenas a recursos individuais.
 
-## [*] Card 11 — Implementar GET /bff/users/{id}/orders — pedidos por cliente
+## [OK] Card 11 — Implementar GET /bff/users/{id}/orders — pedidos por cliente
 
 Descrição: Implementar um terceiro endpoint de composição: dado um `user_id`, retornar os dados do cliente junto com todos os seus pedidos (já enriquecidos com nome dos produtos). Demonstra que o BFF pode oferecer endpoints orientados ao caso de uso do frontend, e não apenas ao modelo interno dos serviços.
 
 ---
 
-# [*] Epic 4 — Tratamento de Falhas
+# [OK] Epic 4 — Tratamento de Falhas
 
-## [*] Card 12 — Implementar timeout nas chamadas downstream
+## [OK] Card 12 — Implementar timeout nas chamadas downstream
 
 Descrição: Configurar timeout em todos os clientes HTTP do BFF (ex: `DOWNSTREAM_TIMEOUT=5` segundos via `.env`). Simular um serviço lento adicionando um delay artificial em um endpoint e validar que o BFF retorna erro dentro do timeout configurado, sem bloquear indefinidamente.
 
-## [*] Card 13 — Tratar serviço downstream indisponível (graceful degradation)
+## [OK] Card 13 — Tratar serviço downstream indisponível (graceful degradation)
 
 Descrição: Definir o comportamento do BFF quando um serviço downstream está fora do ar. Para dados não críticos (ex: detalhes do produto), o BFF deve retornar a resposta parcial com um indicador de degradação em vez de falhar completamente. Para dados críticos (ex: o pedido em si não carregou), retornar erro com status adequado. Validar parando um serviço com `docker compose stop`.
 
-## [*] Card 14 — Padronizar respostas de erro do BFF
+## [OK] Card 14 — Padronizar respostas de erro do BFF
 
 Descrição: Criar um formato de erro consistente para o BFF: `{"error": "mensagem", "service": "qual serviço falhou", "type": "tipo do erro"}`. Garantir que erros de timeout, 404 dos serviços downstream e erros inesperados sempre retornem nesse formato, sem vazar detalhes internos para o cliente.
 

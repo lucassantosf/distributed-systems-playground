@@ -1,12 +1,51 @@
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routers import orders
+from app.exceptions import BFFException, bff_exception_handler
+from app.routers import orders, users
 
 app = FastAPI(title="BFF", version="0.1.0")
 
+# Register custom exception handler for BFFException
+app.add_exception_handler(BFFException, bff_exception_handler)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Standardizes unexpected or built-in HTTPExceptions into the unified BFF error format."""
+    type_map = {
+        404: "not_found",
+        504: "timeout",
+        503: "service_unavailable",
+        422: "validation_error",
+    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": str(exc.detail),
+            "service": "bff",
+            "type": type_map.get(exc.status_code, "http_error"),
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catches all unhandled exceptions to prevent internal implementation leaks."""
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "An unexpected internal server error occurred",
+            "service": "bff",
+            "type": "internal_error",
+        },
+    )
+
+
 app.include_router(orders.router)
+app.include_router(users.router)
 
 
 @app.get("/health")

@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -72,12 +73,16 @@ _orders_by_id: dict[int, Order] = {o.id: o for o in ORDERS}
 
 
 @router.get("", response_model=list[Order])
-def list_orders():
+async def list_orders(delay: float = 0.0):
+    if delay > 0:
+        await asyncio.sleep(delay)
     return ORDERS
 
 
 @router.get("/{order_id}", response_model=Order)
-def get_order(order_id: int):
+async def get_order(order_id: int, delay: float = 0.0):
+    if delay > 0:
+        await asyncio.sleep(delay)
     order = _orders_by_id.get(order_id)
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
