@@ -325,21 +325,21 @@ Descrição: Criar um formato de erro consistente para o BFF: `{"error": "mensag
 
 ---
 
-# [*] Epic 5 — Frontend
+# [OK] Epic 5 — Frontend
 
-## [*] Card 15 — Criar estrutura inicial do frontend
+## [OK] Card 15 — Criar estrutura inicial do frontend
 
 Descrição: Inicializar o projeto React com Vite e TypeScript dentro do diretório `frontend/`. Configurar o container no Docker Compose. Criar uma página inicial simples que confirma a conexão com o BFF chamando `GET /health`. Ao final, o frontend sobe em `http://localhost:5173`.
 
-## [*] Card 16 — Tela de lista de pedidos
+## [OK] Card 16 — Tela de lista de pedidos
 
 Descrição: Criar a tela de listagem de pedidos consumindo `GET /bff/orders`. Exibir para cada pedido: id, nome do cliente, status e total. Demonstrar que o frontend recebe dados já compostos, sem precisar saber que existem dois serviços por trás (order e user).
 
-## [*] Card 17 — Tela de detalhe do pedido
+## [OK] Card 17 — Tela de detalhe do pedido
 
 Descrição: Criar a tela de detalhe de um pedido consumindo `GET /bff/orders/{id}`. Exibir: dados do cliente, status do pedido, lista de itens com nome do produto, quantidade e preço, e total geral. Todos os dados vêm em uma única resposta do BFF.
 
-## [*] Card 18 — Demonstrar o valor do BFF
+## [OK] Card 18 — Demonstrar o valor do BFF
 
 Descrição: Criar uma página de comparação no frontend (apenas para fins didáticos): um botão que carrega o detalhe do pedido via BFF (1 chamada) e outro que tenta montar a mesma tela chamando os três serviços diretamente (3 chamadas, montando os dados no cliente). Exibir o número de chamadas e o tempo de cada abordagem. Esse card deixa o contraste visível na prática.
 
