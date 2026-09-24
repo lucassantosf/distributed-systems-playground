@@ -1,12 +1,32 @@
+from contextlib import asynccontextmanager
+import logging
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from app import cache
 from app.config import settings
 from app.exceptions import BFFException, bff_exception_handler
 from app.routers import orders, users
 
-app = FastAPI(title="BFF", version="0.1.0")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("bff.main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: check Redis connection
+    redis_ok = await cache.ping_redis()
+    if redis_ok:
+        logger.info("Connected to Redis successfully.")
+    else:
+        logger.warning("Could not connect to Redis at startup.")
+    yield
+    # Shutdown: close Redis connection
+    await cache.close_redis()
+
+
+app = FastAPI(title="BFF", version="0.1.0", lifespan=lifespan)
 
 # Register custom exception handler for BFFException
 app.add_exception_handler(BFFException, bff_exception_handler)
@@ -55,7 +75,7 @@ def health():
 
 @app.get("/health/downstream")
 async def health_downstream():
-    """Verifica a conectividade do BFF com cada serviço downstream."""
+    """Verifica a conectividade do BFF com cada serviço downstream e Redis."""
     services = {
         "user-service": f"{settings.user_service_url}/health",
         "product-service": f"{settings.product_service_url}/health",
@@ -72,6 +92,13 @@ async def health_downstream():
                 results[name] = {"status": "error", "detail": "timeout"}
             except Exception as e:
                 results[name] = {"status": "error", "detail": str(e)}
+
+    # Check Redis
+    redis_ok = await cache.ping_redis()
+    results["redis"] = {
+        "status": "ok" if redis_ok else "error",
+        "detail": "connected" if redis_ok else "unreachable",
+    }
 
     all_ok = all(r["status"] == "ok" for r in results.values())
     return {

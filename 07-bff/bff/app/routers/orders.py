@@ -1,7 +1,9 @@
 import asyncio
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
+from app import cache
 from app.clients import order_client, product_client, user_client
+from app.config import settings
 from app.exceptions import BFFException
 from app.schemas.order_detail import (
     CustomerInfo,
@@ -14,7 +16,17 @@ router = APIRouter(prefix="/bff/orders", tags=["bff-orders"])
 
 
 @router.get("", response_model=list[OrderSummary])
-async def list_order_summaries(delay: float = 0.0):
+async def list_order_summaries(response: Response, delay: float = 0.0):
+    cache_key = "orders_list"
+
+    if delay == 0:
+        cached_data = await cache.get_cache(cache_key)
+        if cached_data is not None:
+            response.headers["X-Cache"] = "HIT"
+            return cached_data
+
+    response.headers["X-Cache"] = "MISS"
+
     params = {"delay": delay} if delay > 0 else None
     orders_task = order_client.list_orders(params=params)
     users_task = user_client.list_users()
@@ -67,11 +79,26 @@ async def list_order_summaries(delay: float = 0.0):
             )
         )
 
+    if delay == 0 and not users_degraded:
+        cache_data = [s.model_dump() for s in summaries]
+        await cache.set_cache(cache_key, cache_data, ttl=settings.list_cache_ttl)
+
     return summaries
 
 
 @router.get("/{order_id}", response_model=OrderDetail)
-async def get_order_detail(order_id: int, delay: float = 0.0):
+async def get_order_detail(order_id: int, response: Response, delay: float = 0.0):
+    cache_key = f"order_detail:{order_id}"
+
+    # Check cache if delay is 0
+    if delay == 0:
+        cached_data = await cache.get_cache(cache_key)
+        if cached_data is not None:
+            response.headers["X-Cache"] = "HIT"
+            return cached_data
+
+    response.headers["X-Cache"] = "MISS"
+
     params = {"delay": delay} if delay > 0 else None
     order = await order_client.get_order(order_id, params=params)
     if not order:
@@ -128,7 +155,7 @@ async def get_order_detail(order_id: int, delay: float = 0.0):
             )
         )
 
-    return OrderDetail(
+    result_detail = OrderDetail(
         order_id=order["id"],
         status=order["status"],
         total=order["total"],
@@ -136,3 +163,8 @@ async def get_order_detail(order_id: int, delay: float = 0.0):
         items=items_detail,
         is_degraded=is_degraded,
     )
+
+    if delay == 0 and not is_degraded:
+        await cache.set_cache(cache_key, result_detail.model_dump(), ttl=settings.cache_ttl)
+
+    return result_detail

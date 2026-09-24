@@ -1,5 +1,13 @@
 services:
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - bff-net
+
   bff:
     build:
       context: ./bff
@@ -9,6 +17,7 @@ services:
     env_file:
       - .env
     depends_on:
+      - redis
       - user-service
       - product-service
       - order-service

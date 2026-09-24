@@ -5,6 +5,9 @@ class Settings(BaseSettings):
     product_service_url: str = "http://product-service:8002"
     order_service_url: str = "http://order-service:8003"
     downstream_timeout: float = 5.0
+    redis_url: str = "redis://redis:6379"
+    cache_ttl: int = 60
+    list_cache_ttl: int = 30
 
     model_config = {"env_file": ".env"}
 

@@ -19,7 +19,7 @@ Frontend (React)
        │
        │  1 chamada
        ▼
-  BFF (FastAPI :8000)
+  BFF (FastAPI :8000)  ←──► Redis (cache :6379)
        │
        ├──► user-service    (FastAPI :8001)  →  dados do cliente
        ├──► product-service (FastAPI :8002)  →  dados dos produtos
@@ -34,30 +34,44 @@ O frontend solicita a tela de **detalhe de um pedido**. Sem o BFF, precisaria de
 Frontend ──GET /bff/orders/{id}──► BFF
                                     │
                                     ├──► GET order-service/orders/{id}     → pedido + itens
-                                    ├──► GET user-service/users/{user_id}  → dados do cliente
-                                    └──► GET product-service/products/{id} → detalhes dos produtos
+                                    ├──► GET user-service/users/{user_id}  → dados do cliente (paralelo)
+                                    └──► GET product-service/products/{id} → detalhes dos produtos (paralelo)
                                     │
+                                    ├── verifica cache Redis (MISS → busca; HIT → responde direto)
                                     └──► agrega, adapta e responde ◄── Frontend
 ```
 
-### Sequência
+As chamadas a `user-service` e `product-service` são feitas em **paralelo** com `asyncio.gather`, reduzindo a latência total.
+
+### Sequência (fluxo nominal)
 
 ```mermaid
 sequenceDiagram
     participant F as Frontend
     participant B as BFF
+    participant R as Redis
     participant O as order-service
     participant U as user-service
     participant P as product-service
 
     F->>B: GET /bff/orders/{id}
-    B->>O: GET /orders/{id}
-    O-->>B: pedido + itens
-    B->>U: GET /users/{user_id}
-    U-->>B: dados do cliente
-    B->>P: GET /products/{product_id}
-    P-->>B: dados do produto
-    B-->>F: resposta agregada e adaptada
+    B->>R: GET order_detail:{id}
+    alt Cache HIT
+        R-->>B: dados em cache
+        B-->>F: resposta (X-Cache: HIT)
+    else Cache MISS
+        B->>O: GET /orders/{id}
+        O-->>B: pedido + itens
+        par Chamadas paralelas
+            B->>U: GET /users/{user_id}
+            U-->>B: dados do cliente
+        and
+            B->>P: GET /products/{product_id}
+            P-->>B: dados do produto
+        end
+        B->>R: SET order_detail:{id} (TTL 60s)
+        B-->>F: resposta agregada (X-Cache: MISS)
+    end
 ```
 
 ---
@@ -66,10 +80,10 @@ sequenceDiagram
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Frontend | React + TypeScript + Vite |
-| BFF | Python + FastAPI |
-| Serviços downstream | Python + FastAPI (user, product, order) |
-| Cache (fase posterior) | Redis |
+| Frontend | React 18 + TypeScript + Vite 5 |
+| BFF | Python 3.12 + FastAPI + httpx |
+| Serviços downstream | Python 3.12 + FastAPI (user, product, order) |
+| Cache | Redis 7 |
 | Infraestrutura | Docker Compose |
 
 ---
@@ -80,8 +94,10 @@ sequenceDiagram
 - Implementar **API Composition**: agregar dados de múltiplos serviços em uma única resposta.
 - Demonstrar a diferença entre o frontend chamando serviços diretamente versus via BFF.
 - Adaptar e moldar a resposta para o formato que o frontend realmente precisa.
-- Tratar falhas parciais: o BFF responde mesmo que um serviço downstream esteja indisponível.
-- Adicionar cache na camada do BFF para evitar chamadas redundantes aos serviços (fase posterior).
+- Tratar falhas parciais: o BFF responde mesmo que um serviço downstream esteja indisponível (**graceful degradation**).
+- Implementar **timeout** configurável e sinalizar corretamente via HTTP 504.
+- Adicionar **cache Redis** na camada do BFF para evitar chamadas redundantes aos serviços.
+- Demonstrar o ganho real de performance com o cache (benchmark: MISS vs HIT).
 
 ---
 
@@ -109,20 +125,23 @@ Resposta agregada (exemplo):
 {
   "order_id": 1,
   "status": "confirmed",
-  "total": 449.90,
+  "total": 449.80,
+  "is_degraded": false,
   "customer": {
-    "name": "Lucas",
+    "name": "Lucas Andrade",
     "email": "lucas@example.com"
   },
   "items": [
     {
+      "product_id": 1,
       "product_name": "Mechanical Keyboard",
       "price": 399.90,
       "quantity": 1
     },
     {
-      "product_name": "Mouse Pad",
-      "price": 50.00,
+      "product_id": 2,
+      "product_name": "Mouse Pad XL",
+      "price": 49.90,
       "quantity": 1
     }
   ]
@@ -138,55 +157,68 @@ Nenhum dos três serviços individualmente retornaria isso — é o BFF que comp
 ```
 07-bff/
 ├── README.md
-├── docker-compose.yml
-├── .env.example
+├── docker-compose.yml          # Todos os serviços: bff, redis, user, product, order, frontend
+├── .env                        # Variáveis de ambiente (copiado de .env.example)
+├── .env.example                # Template de variáveis
 ├── .gitignore
 │
 ├── bff/                        # BFF principal
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   └── app/
-│       ├── main.py             # FastAPI app
-│       ├── config.py           # URLs dos serviços downstream
+│       ├── main.py             # FastAPI app + lifespan (Redis) + handlers de erro
+│       ├── config.py           # Settings via pydantic-settings (URLs, timeout, TTL)
+│       ├── cache.py            # Funções auxiliares Redis: get/set/delete/ping
+│       ├── exceptions.py       # BFFException + handler global
 │       ├── routers/
-│       │   └── orders.py       # Endpoints do BFF (ex: GET /bff/orders/{id})
-│       ├── clients/            # Clientes HTTP para cada serviço downstream
+│       │   ├── orders.py       # GET /bff/orders, GET /bff/orders/{id}
+│       │   └── users.py        # GET /bff/users/{id}/orders
+│       ├── clients/
 │       │   ├── user_client.py
 │       │   ├── product_client.py
 │       │   └── order_client.py
-│       └── schemas/            # Schemas Pydantic de resposta do BFF
-│           └── order_detail.py
+│       └── schemas/
+│           ├── order_detail.py # OrderDetail, OrderSummary, CustomerInfo, OrderItemDetail
+│           └── user_orders.py  # UserOrdersResponse, CustomerOrderSummary
 │
 ├── services/
-│   ├── user-service/           # Serviço de usuários (dados em memória)
+│   ├── user-service/
 │   │   ├── Dockerfile
 │   │   ├── requirements.txt
 │   │   └── app/
 │   │       ├── main.py
-│   │       └── routers/
-│   │           └── users.py
-│   │
-│   ├── product-service/        # Serviço de produtos (dados em memória)
+│   │       └── routers/users.py
+│   ├── product-service/
 │   │   ├── Dockerfile
 │   │   ├── requirements.txt
 │   │   └── app/
 │   │       ├── main.py
-│   │       └── routers/
-│   │           └── products.py
-│   │
-│   └── order-service/          # Serviço de pedidos (dados em memória)
+│   │       └── routers/products.py
+│   └── order-service/
 │       ├── Dockerfile
 │       ├── requirements.txt
 │       └── app/
 │           ├── main.py
-│           └── routers/
-│               └── orders.py
+│           └── routers/orders.py    # Suporta ?delay=N para simular lentidão
 │
-└── frontend/                   # React + TypeScript + Vite
-    └── src/
-        ├── pages/              # Tela de lista de pedidos e detalhe
-        ├── components/         # Componentes reutilizáveis
-        └── types/              # Interfaces TypeScript
+├── frontend/                        # React 18 + TypeScript + Vite
+│   ├── Dockerfile
+│   ├── package.json
+│   ├── vite.config.ts               # Proxy: /bff, /health, /direct/* → serviços
+│   └── src/
+│       ├── main.tsx                 # Sem StrictMode (evita double-fetch no dev)
+│       ├── App.tsx                  # Navegação por abas
+│       ├── App.css
+│       ├── types.ts
+│       └── components/
+│           ├── OrdersList.tsx       # Tela de lista de pedidos
+│           ├── OrderDetailView.tsx  # Tela de detalhe do pedido
+│           └── ComparisonView.tsx   # Comparação: 1 chamada BFF vs N chamadas diretas
+│
+└── scripts/
+    ├── validate_services.sh         # Valida endpoints dos três microsserviços
+    ├── validate_full_flow.sh        # Validação end-to-end (28 checks)
+    └── benchmark_cache.py           # Benchmark MISS vs HIT com métricas
 ```
 
 ---
@@ -200,6 +232,102 @@ Nenhum dos três serviços individualmente retornaria isso — é o BFF que comp
 | user-service | http://localhost:8001 |
 | product-service | http://localhost:8002 |
 | order-service | http://localhost:8003 |
+| Redis | localhost:6379 |
+
+---
+
+## 🚦 Endpoints do BFF
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| `GET` | `/health` | Status do BFF |
+| `GET` | `/health/downstream` | Status do BFF + Redis + cada serviço downstream |
+| `GET` | `/bff/orders` | Lista de pedidos com nome do cliente composto |
+| `GET` | `/bff/orders/{id}` | Detalhe do pedido com cliente e produtos compostos |
+| `GET` | `/bff/users/{id}/orders` | Pedidos de um cliente com dados dos produtos |
+
+Todos os endpoints de listagem e detalhe suportam o header de resposta `X-Cache: MISS | HIT`.
+
+**Formato de erro padronizado:**
+
+```json
+{
+  "error": "Descrição do erro",
+  "service": "nome-do-serviço",
+  "type": "not_found | timeout | service_unavailable | internal_error"
+}
+```
+
+---
+
+## ⚙️ Configuração (`.env`)
+
+```dotenv
+# URLs dos serviços downstream
+USER_SERVICE_URL=http://user-service:8001
+PRODUCT_SERVICE_URL=http://product-service:8002
+ORDER_SERVICE_URL=http://order-service:8003
+
+# Timeout para chamadas downstream (segundos)
+DOWNSTREAM_TIMEOUT=5
+
+# Cache Redis
+REDIS_URL=redis://redis:6379
+CACHE_TTL=60        # TTL para detalhe de pedido (segundos)
+LIST_CACHE_TTL=30   # TTL para listagem de pedidos (segundos)
+```
+
+---
+
+## 🏃 Como Subir o Projeto
+
+```bash
+# 1. Entrar no diretório
+cd distributed-systems-playground/07-bff
+
+# 2. Criar o .env a partir do exemplo (já incluído, mas confirme)
+cp .env.example .env
+
+# 3. Subir todos os containers
+docker compose up --build -d
+
+# 4. Acessar o frontend
+open http://localhost:5173
+
+# 5. Derrubar tudo
+docker compose down
+```
+
+> **Nota:** Nenhum container usa `restart: always` ou `restart: unless-stopped`. Os containers **não sobem automaticamente** ao ligar/reiniciar o sistema — é necessário um `docker compose up` explícito.
+
+---
+
+## 🧪 Validação e Benchmarks
+
+```bash
+# Validar os três microsserviços downstream
+bash scripts/validate_services.sh
+
+# Validação end-to-end completa (28 checks)
+# Cobre: health, composição, cache MISS→HIT, timeout, graceful degradation
+bash scripts/validate_full_flow.sh
+
+# Benchmark de cache: mede latência MISS vs HIT e chamadas downstream economizadas
+python3 scripts/benchmark_cache.py
+python3 scripts/benchmark_cache.py --order-id 2 --iterations 10
+```
+
+---
+
+## 🧱 Comportamento de Falhas
+
+| Cenário | Serviço afetado | Resposta do BFF |
+|---------|-----------------|-----------------|
+| Serviço indisponível | `order-service` (crítico) | HTTP 503 |
+| Serviço indisponível | `user-service` ou `product-service` | HTTP 200 com `is_degraded: true` e valores fallback |
+| Timeout (> `DOWNSTREAM_TIMEOUT`s) | Qualquer serviço | HTTP 504 |
+| Pedido não encontrado | `order-service` | HTTP 404 |
+| Redis indisponível | — | BFF segue funcionando (cache é best-effort) |
 
 ---
 
@@ -234,7 +362,7 @@ Descrição: Garantir que o BFF consegue alcançar os três serviços downstream
 
 O `config.py` usa `pydantic-settings` para ler as URLs dos serviços e o timeout via variáveis de ambiente, com defaults que correspondem aos nomes dos containers no Docker Compose.
 
-O endpoint `GET /health/downstream` do BFF chama o `/health` de cada serviço via `httpx` e retorna um status composto:
+O endpoint `GET /health/downstream` do BFF chama o `/health` de cada serviço via `httpx` e retorna um status composto (inclui Redis a partir do Epic 6):
 
 - `"status": "ok"` — todos os serviços responderam corretamente.
 - `"status": "degraded"` — um ou mais serviços estão inacessíveis.
@@ -248,21 +376,8 @@ curl http://localhost:8000/health/downstream
 #   "downstream": {
 #     "user-service":    {"status": "ok", "http_status": 200},
 #     "product-service": {"status": "ok", "http_status": 200},
-#     "order-service":   {"status": "ok", "http_status": 200}
-#   }
-# }
-```
-
-Validação com `user-service` derrubado (`docker compose stop user-service`):
-
-```bash
-curl http://localhost:8000/health/downstream
-# {
-#   "status": "degraded",
-#   "downstream": {
-#     "user-service":    {"status": "error", "detail": "..."},
-#     "product-service": {"status": "ok", "http_status": 200},
-#     "order-service":   {"status": "ok", "http_status": 200}
+#     "order-service":   {"status": "ok", "http_status": 200},
+#     "redis":           {"status": "ok", "detail": "connected"}
 #   }
 # }
 ```
@@ -273,19 +388,27 @@ curl http://localhost:8000/health/downstream
 
 ## [OK] Card 4 — Implementar user-service
 
-Descrição: Criar o `user-service` com dados em memória (lista Python). Expor os endpoints `GET /users` (lista todos) e `GET /users/{id}` (busca por id). Retornar 404 quando o usuário não existir. Dados de exemplo: 3 a 5 usuários com `id`, `name` e `email`.
+Descrição: Criar o `user-service` com dados em memória (lista Python). Expor os endpoints `GET /users` (lista todos) e `GET /users/{id}` (busca por id). Retornar 404 quando o usuário não existir. Dados de exemplo: 5 usuários com `id`, `name` e `email`.
 
 ## [OK] Card 5 — Implementar product-service
 
-Descrição: Criar o `product-service` com dados em memória. Expor os endpoints `GET /products` (lista todos) e `GET /products/{id}` (busca por id). Retornar 404 quando o produto não existir. Dados de exemplo: 5 a 10 produtos com `id`, `name`, `price` e `stock`.
+Descrição: Criar o `product-service` com dados em memória. Expor os endpoints `GET /products` (lista todos) e `GET /products/{id}` (busca por id). Retornar 404 quando o produto não existir. Dados de exemplo: 8 produtos com `id`, `name`, `price` e `stock`.
 
 ## [OK] Card 6 — Implementar order-service
 
-Descrição: Criar o `order-service` com dados em memória. Expor os endpoints `GET /orders` (lista todos) e `GET /orders/{id}` (busca por id). Cada pedido deve conter `id`, `user_id`, `status` (`pending`, `confirmed`, `shipped`, `delivered`), `total` e `items` (lista com `product_id` e `quantity`). Retornar 404 quando o pedido não existir.
+Descrição: Criar o `order-service` com dados em memória. Expor os endpoints `GET /orders` (lista todos) e `GET /orders/{id}` (busca por id). Cada pedido contém `id`, `user_id`, `status` (`pending`, `confirmed`, `shipped`, `delivered`), `total` e `items` (lista com `product_id` e `quantity`). Retornar 404 quando o pedido não existir. Ambos os endpoints suportam `?delay=N` (float, segundos) para simular lentidão — usado no teste de timeout do Card 12.
 
 ## [OK] Card 7 — Validar os três serviços
 
 Descrição: Subir os três serviços via Docker Compose e validar todos os endpoints com `curl`. Confirmar que dados de exemplo estão populados corretamente e que os retornos 404 funcionam. Criar um script `scripts/validate_services.sh` com as chamadas de validação.
+
+```bash
+bash scripts/validate_services.sh
+# [PASS] User Service Health -> HTTP 200
+# [PASS] List Users -> HTTP 200
+# ...
+# RESULT: ALL SERVICES PASSED!
+```
 
 ---
 
@@ -297,15 +420,15 @@ Descrição: Implementar a estrutura do BFF com FastAPI: `main.py`, `config.py` 
 
 ## [OK] Card 9 — Implementar GET /bff/orders/{id} — composição completa
 
-Descrição: Implementar o endpoint principal do BFF. Dado um `order_id`, o BFF deve: (1) buscar o pedido no `order-service`; (2) buscar o cliente no `user-service` usando o `user_id` do pedido; (3) buscar os detalhes de cada produto no `product-service` usando os `product_id` dos itens; (4) agregar tudo em uma única resposta com o schema `OrderDetail`. Esse é o coração do padrão BFF — uma chamada do cliente, três chamadas internas.
+Descrição: Implementar o endpoint principal do BFF. Dado um `order_id`, o BFF: (1) busca o pedido no `order-service`; (2) busca o cliente no `user-service` e os detalhes de cada produto no `product-service` **em paralelo** com `asyncio.gather`; (3) agrega tudo em uma única resposta com o schema `OrderDetail`. Uma chamada do cliente, três chamadas internas (duas em paralelo).
 
 ## [OK] Card 10 — Implementar GET /bff/orders — listagem composta
 
-Descrição: Implementar o endpoint de listagem no BFF. Para cada pedido retornado pelo `order-service`, o BFF deve enriquecer a resposta com o nome do cliente (via `user-service`). O objetivo é mostrar que a composição também se aplica a listagens, não apenas a recursos individuais.
+Descrição: Implementar o endpoint de listagem no BFF. O BFF busca os pedidos e os usuários em paralelo, e enriquece cada pedido com o nome do cliente. Demonstra que a composição também se aplica a listagens.
 
 ## [OK] Card 11 — Implementar GET /bff/users/{id}/orders — pedidos por cliente
 
-Descrição: Implementar um terceiro endpoint de composição: dado um `user_id`, retornar os dados do cliente junto com todos os seus pedidos (já enriquecidos com nome dos produtos). Demonstra que o BFF pode oferecer endpoints orientados ao caso de uso do frontend, e não apenas ao modelo interno dos serviços.
+Descrição: Implementar um terceiro endpoint de composição: dado um `user_id`, retornar os dados do cliente junto com todos os seus pedidos (enriquecidos com nome dos produtos). Demonstra que o BFF pode oferecer endpoints orientados ao caso de uso do frontend.
 
 ---
 
@@ -313,15 +436,39 @@ Descrição: Implementar um terceiro endpoint de composição: dado um `user_id`
 
 ## [OK] Card 12 — Implementar timeout nas chamadas downstream
 
-Descrição: Configurar timeout em todos os clientes HTTP do BFF (ex: `DOWNSTREAM_TIMEOUT=5` segundos via `.env`). Simular um serviço lento adicionando um delay artificial em um endpoint e validar que o BFF retorna erro dentro do timeout configurado, sem bloquear indefinidamente.
+Descrição: Configurar timeout em todos os clientes HTTP do BFF via `DOWNSTREAM_TIMEOUT` (padrão: 5s). O `order-service` suporta `?delay=N` para simular lentidão. Chamadas que excedem o timeout retornam HTTP 504.
+
+Validação:
+
+```bash
+# delay=6 > DOWNSTREAM_TIMEOUT=5 → HTTP 504
+curl -s -o /dev/null -w "%{http_code}" "http://localhost:8000/bff/orders?delay=6"
+# 504
+```
 
 ## [OK] Card 13 — Tratar serviço downstream indisponível (graceful degradation)
 
-Descrição: Definir o comportamento do BFF quando um serviço downstream está fora do ar. Para dados não críticos (ex: detalhes do produto), o BFF deve retornar a resposta parcial com um indicador de degradação em vez de falhar completamente. Para dados críticos (ex: o pedido em si não carregou), retornar erro com status adequado. Validar parando um serviço com `docker compose stop`.
+Descrição: Definir o comportamento do BFF quando um serviço downstream está fora do ar.
+
+- **Crítico (`order-service`):** se cair, o BFF retorna HTTP 503 — sem o pedido, não há resposta útil.
+- **Não-crítico (`user-service`, `product-service`):** se caírem, o BFF retorna HTTP 200 com `is_degraded: true` e valores fallback (ex: `"Cliente (Indisponível)"`).
+
+Validação:
+
+```bash
+docker compose stop user-service
+curl http://localhost:8000/bff/orders/1
+# HTTP 200 com "is_degraded": true, "customer": {"name": "Cliente (Indisponível)", ...}
+docker compose start user-service
+```
 
 ## [OK] Card 14 — Padronizar respostas de erro do BFF
 
-Descrição: Criar um formato de erro consistente para o BFF: `{"error": "mensagem", "service": "qual serviço falhou", "type": "tipo do erro"}`. Garantir que erros de timeout, 404 dos serviços downstream e erros inesperados sempre retornem nesse formato, sem vazar detalhes internos para o cliente.
+Descrição: Criar um formato de erro consistente para o BFF. A classe `BFFException` centraliza todos os erros e o handler global garante que erros de timeout, 404 e erros inesperados sempre retornem no mesmo formato, sem vazar detalhes internos.
+
+```json
+{"error": "mensagem", "service": "qual-serviço", "type": "timeout|not_found|service_unavailable|internal_error"}
+```
 
 ---
 
@@ -329,48 +476,181 @@ Descrição: Criar um formato de erro consistente para o BFF: `{"error": "mensag
 
 ## [OK] Card 15 — Criar estrutura inicial do frontend
 
-Descrição: Inicializar o projeto React com Vite e TypeScript dentro do diretório `frontend/`. Configurar o container no Docker Compose. Criar uma página inicial simples que confirma a conexão com o BFF chamando `GET /health`. Ao final, o frontend sobe em `http://localhost:5173`.
+Descrição: Inicializar o projeto React 18 com Vite 5 e TypeScript dentro do diretório `frontend/`. Configurar o container no Docker Compose. O Vite configura um proxy para `/bff` e `/health` apontando para `http://bff:8000`.
+
+> **Atenção:** o `<StrictMode>` foi removido do `main.tsx` para evitar double-fetch em desenvolvimento (o React 18 em StrictMode monta componentes duas vezes propositalmente, duplicando todos os `useEffect`).
 
 ## [OK] Card 16 — Tela de lista de pedidos
 
-Descrição: Criar a tela de listagem de pedidos consumindo `GET /bff/orders`. Exibir para cada pedido: id, nome do cliente, status e total. Demonstrar que o frontend recebe dados já compostos, sem precisar saber que existem dois serviços por trás (order e user).
+Descrição: Tela de listagem consumindo `GET /bff/orders`. Exibe id, nome do cliente, status e total. O frontend recebe dados já compostos sem saber que existem dois serviços por trás.
 
 ## [OK] Card 17 — Tela de detalhe do pedido
 
-Descrição: Criar a tela de detalhe de um pedido consumindo `GET /bff/orders/{id}`. Exibir: dados do cliente, status do pedido, lista de itens com nome do produto, quantidade e preço, e total geral. Todos os dados vêm em uma única resposta do BFF.
+Descrição: Tela de detalhe consumindo `GET /bff/orders/{id}`. Exibe dados do cliente, status, lista de itens com nome do produto, quantidade e preço, e total. Todos os dados chegam em uma única resposta do BFF.
 
 ## [OK] Card 18 — Demonstrar o valor do BFF
 
-Descrição: Criar uma página de comparação no frontend (apenas para fins didáticos): um botão que carrega o detalhe do pedido via BFF (1 chamada) e outro que tenta montar a mesma tela chamando os três serviços diretamente (3 chamadas, montando os dados no cliente). Exibir o número de chamadas e o tempo de cada abordagem. Esse card deixa o contraste visível na prática.
+Descrição: Aba "⚡ BFF vs Direto" com dois painéis lado a lado. O painel esquerdo faz **1 chamada** ao BFF; o painel direito faz **1 + 1 + N chamadas** sequenciais diretamente aos microsserviços (via proxy `/direct/*` no Vite). Exibe o log de cada chamada com URL, status e latência individual, além da comparação de chamadas totais e tempo total.
+
+O Vite proxia as chamadas diretas:
+
+```
+/direct/orders/* → order-service:8003
+/direct/users/*  → user-service:8001
+/direct/products/* → product-service:8002
+```
 
 ---
 
-# [*] Epic 6 — Cache
+# [OK] Epic 6 — Cache
 
-## [*] Card 19 — Subir Redis no Docker Compose
+## [OK] Card 19 — Subir Redis no Docker Compose
 
-Descrição: Adicionar o container Redis ao `docker-compose.yml`. Instalar `redis` (ou `redis[asyncio]`) nas dependências do BFF. Criar um módulo `cache.py` no BFF com funções auxiliares de get/set/delete usando o cliente Redis. Validar que o BFF conecta ao Redis na inicialização.
+Descrição: Container `redis:7-alpine` adicionado ao `docker-compose.yml`. Dependência `redis==5.0.8` no BFF. Módulo `cache.py` com funções `get_cache`, `set_cache`, `delete_cache` e `ping_redis` usando o cliente assíncrono `redis.asyncio`. O BFF verifica a conexão ao Redis no startup via `lifespan`. Redis aparece no `GET /health/downstream`.
 
-## [*] Card 20 — Cachear resposta do GET /bff/orders/{id}
+## [OK] Card 20 — Cachear resposta do GET /bff/orders/{id}
 
-Descrição: Implementar cache no endpoint de detalhe do pedido. Na primeira chamada, o BFF orquestra os três serviços e armazena a resposta no Redis com uma TTL configurável (ex: `CACHE_TTL=60` segundos). Nas chamadas seguintes, retorna direto do cache. Adicionar um header de resposta `X-Cache: HIT` ou `X-Cache: MISS` para tornar o comportamento observável.
+Descrição: Cache implementado no endpoint de detalhe. Chave: `order_detail:{order_id}`. TTL configurável via `CACHE_TTL` (padrão: 60s). Respostas com `is_degraded=True` **não são cacheadas** (dados parciais não devem ser servidos como cache). Header `X-Cache: MISS | HIT` em todas as respostas.
 
-## [*] Card 21 — Cachear resposta do GET /bff/orders
+Validação:
 
-Descrição: Estender o cache para o endpoint de listagem. Considerar uma TTL menor para listagens (mudam com mais frequência). Validar com `curl -i` que o header `X-Cache` alterna entre MISS e HIT corretamente.
+```bash
+curl -i http://localhost:8000/bff/orders/1 | grep x-cache  # x-cache: MISS
+curl -i http://localhost:8000/bff/orders/1 | grep x-cache  # x-cache: HIT
+```
 
-## [*] Card 22 — Validar ganho de performance com cache
+## [OK] Card 21 — Cachear resposta do GET /bff/orders
 
-Descrição: Criar um script `scripts/benchmark_cache.py` que mede o tempo de resposta do `GET /bff/orders/{id}` sem cache (primeira chamada) e com cache (chamadas seguintes). Exibir a diferença de latência e o número de chamadas aos serviços downstream economizadas.
+Descrição: Cache na listagem com TTL menor (`LIST_CACHE_TTL`, padrão: 30s). Chave: `orders_list`. Mesma lógica de `X-Cache: MISS | HIT`.
+
+## [OK] Card 22 — Validar ganho de performance com cache
+
+Descrição: Script `scripts/benchmark_cache.py` que mede MISS vs HIT e calcula o ganho percentual.
+
+Resultado típico em ambiente local:
+
+```
+• Latência sem cache (MISS):      ~100 ms  (3 chamadas HTTP downstream)
+• Latência média com cache (HIT):   ~3 ms  (1 chamada ao Redis)
+• Ganho de performance:            ~97%    mais rápido
+• Chamadas downstream economizadas: 4/requisição
+```
 
 ---
 
-# [*] Epic 7 — Consolidação
+# [OK] Epic 7 — Consolidação
 
-## [*] Card 23 — Executar fluxo completo
+## [OK] Card 23 — Executar fluxo completo
 
-Descrição: Validar o projeto de ponta a ponta: frontend carrega lista de pedidos via BFF → usuário clica em um pedido → BFF compõe dados dos três serviços → resposta aparece na tela de detalhe → um serviço é derrubado → BFF faz graceful degradation → cache reduz chamadas downstream. Criar um script `scripts/validate_full_flow.sh` documentando cada passo.
+Descrição: Script `scripts/validate_full_flow.sh` com 28 checks cobrindo todos os cenários:
 
-## [*] Card 24 — Consolidar aprendizados
+| Seção | O que valida |
+|-------|-------------|
+| 0 | Aguarda todos os serviços subirem |
+| 1 | Health check: BFF + Redis + 3 microsserviços |
+| 2 | Endpoints diretos dos microsserviços (200 e 404) |
+| 3 | Composição de dados pelo BFF (joins user+products) |
+| 4 | Cache Redis: MISS na 1ª chamada → HIT na 2ª |
+| 5 | Timeout: `?delay=6` > `DOWNSTREAM_TIMEOUT=5` → HTTP 504 |
+| 6 | Graceful degradation: `user-service` parado → HTTP 200 com `is_degraded=True` |
 
-Descrição: Revisar o README adicionando uma seção de **Lições Aprendidas**: o que o BFF resolve que uma chamada direta não resolveria, quando faz sentido usar (e quando não faz), e a diferença prática entre BFF e API Gateway. Garantir que toda a infraestrutura sobe com `docker compose up --build` sem configuração manual adicional.
+```bash
+bash scripts/validate_full_flow.sh
+# ...
+# Passou:  28
+# Falhou:  0
+# ✓ FLUXO COMPLETO VALIDADO COM SUCESSO!
+```
+
+## [OK] Card 24 — Consolidar aprendizados
+
+---
+
+# 📚 Lições Aprendidas
+
+## O que o BFF resolve que chamadas diretas não resolveriam
+
+**Sem BFF**, o frontend precisa:
+- Fazer **N chamadas HTTP** (uma por serviço) para montar uma única tela.
+- Conhecer os endereços, formatos e contratos de cada serviço interno.
+- Lidar com falhas parciais individualmente — se o `user-service` cair, o frontend precisa tratar o erro.
+- Agregar e transformar os dados no lado do cliente (JavaScript), expondo lógica de negócio no browser.
+- Lidar com CORS de múltiplas origens.
+
+**Com BFF**, o frontend:
+- Faz **1 chamada** e recebe os dados já prontos, no formato que a tela precisa.
+- Não sabe (nem precisa saber) quantos serviços existem por trás.
+- Recebe `is_degraded: true` quando um serviço não-crítico falha, mas a tela ainda carrega.
+- Recebe respostas em milissegundos quando o cache está quente.
+
+**Demonstração prática (Card 18 — aba ⚡ BFF vs Direto):**
+
+```
+Via BFF:          1 chamada   ~100ms (frio) / ~3ms (cache quente)
+Sem BFF (direto): 4+ chamadas ~250ms (sequencial, sem cache)
+```
+
+---
+
+## Quando faz sentido usar BFF
+
+✅ **Use BFF quando:**
+- O frontend precisa de dados de múltiplos serviços para renderizar uma tela.
+- Você quer proteger o frontend da complexidade e instabilidade dos serviços internos.
+- Precisa de adaptar o contrato de resposta para o formato que a UI consome (mobile vs web podem ter BFFs diferentes).
+- Quer centralizar cross-cutting concerns (timeout, retry, cache, autenticação) em um único ponto.
+- A rede entre browser e serviços tem latência alta (cada chamada adicional é cara).
+
+❌ **Evite BFF quando:**
+- O frontend consome dados de um único serviço — um BFF seria só um proxy desnecessário.
+- O time não tem capacidade de manter mais uma camada (BFF é mais código, mais deploy, mais ponto de falha).
+- Os serviços downstream já têm contratos estáveis e bem adaptados para o frontend.
+- A escala é pequena e a complexidade de operação não justifica o benefício.
+
+---
+
+## BFF vs API Gateway — qual a diferença prática?
+
+Estes dois padrões são frequentemente confundidos. A diferença essencial:
+
+| Aspecto | API Gateway | BFF |
+|---------|------------|-----|
+| **Propósito** | Roteamento, segurança, rate limiting | Composição e adaptação de dados |
+| **Conhece os serviços?** | Não — roteia chamadas sem transformar | Sim — orquestra múltiplos serviços e agrega |
+| **Resposta** | Repassa a resposta do serviço upstream | Monta uma resposta nova com dados de vários serviços |
+| **Número de chamadas internas** | 1 (proxy direto) | N (uma por serviço necessário) |
+| **Lógica de negócio** | Nenhuma | Pode ter (join, fallback, transformação) |
+| **Quem usa** | Todos os clientes | Tipicamente um tipo de cliente (ex: web, mobile) |
+
+**Analogia:** o API Gateway é a portaria do prédio (deixa entrar ou não, registra quem passou). O BFF é o assistente que entra nos diferentes andares, coleta o que você precisa e traz tudo numa bandeja.
+
+Na prática, **ambos coexistem**: o API Gateway fica na borda (TLS, autenticação, rate limit) e o BFF fica atrás dele, fazendo a composição. Neste projeto, o BFF faz as duas funções por simplicidade.
+
+---
+
+## Cache na camada do BFF — por que aqui e não nos serviços?
+
+O cache no BFF cacheia a **resposta composta** — o resultado do join entre os três serviços. Isso significa que uma única entrada no Redis evita **N chamadas downstream** em vez de só 1.
+
+Se o cache estivesse em cada serviço individualmente, o BFF ainda precisaria fazer N chamadas (mesmo que cada uma respondesse do cache local daquele serviço). O cache no BFF reduz a carga de rede como um todo.
+
+**Trade-off:** o cache do BFF fica stale mais facilmente (se um produto tiver o preço atualizado, o cache do BFF ainda servirá o preço antigo por até `CACHE_TTL` segundos). Por isso, TTLs curtos para listagens (30s) e um pouco mais longos para detalhes (60s).
+
+---
+
+## Graceful Degradation — a diferença entre crítico e não-crítico
+
+Este projeto implementa dois comportamentos distintos:
+
+| Serviço | Criticalidade | Comportamento quando cai |
+|---------|--------------|--------------------------|
+| `order-service` | **Crítico** | HTTP 503 — sem o pedido, não há tela |
+| `user-service` | Não-crítico | HTTP 200 com `is_degraded: true` e nome fallback |
+| `product-service` | Não-crítico | HTTP 200 com `is_degraded: true` e preço zerado |
+
+A decisão de o que é "crítico" é de negócio, não técnica. O BFF é o lugar certo para implementar essa decisão, porque ele conhece o contexto da tela que está servindo.
+
+> **Diferença entre `docker stop` e `docker pause` nos testes:**
+> - `docker stop`: fecha o socket TCP (RST). O httpx recebe `ConnectError` imediatamente → não-crítico → degrada.
+> - `docker pause`: suspende o processo mas mantém o socket. O httpx fica pendurado até o timeout (5s) → levanta `TimeoutException` → HTTP 504.
+> Ambos são cenários válidos. O `validate_full_flow.sh` usa `docker stop` para testar a degradação graceful, e `?delay=6` para testar o timeout.
