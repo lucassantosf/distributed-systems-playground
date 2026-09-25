@@ -1,0 +1,160 @@
+{
+  "realm": "distributed-systems",
+  "enabled": true,
+  "displayName": "Distributed Systems",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "refreshTokenMaxReuse": 0,
+
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrador — acessa e gerencia todos os documentos",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "editor",
+        "description": "Editor — cria e edita os próprios documentos",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "viewer",
+        "description": "Visualizador — apenas lê documentos",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+
+  "clients": [
+    {
+      "clientId": "api-simples",
+      "name": "API Simples (Sample A)",
+      "description": "FastAPI protegida por JWT — resource server confidencial",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "GZYImUZPV2W7tWzsQKTbpzdNFI2eLdGC",
+      "clientAuthenticatorType": "client-secret",
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:8001/*"],
+      "webOrigins": ["http://localhost:8001"]
+    },
+    {
+      "clientId": "frontend-pkce",
+      "name": "Frontend PKCE (Sample B)",
+      "description": "SPA React com Authorization Code + PKCE — client público",
+      "enabled": true,
+      "publicClient": true,
+      "clientAuthenticatorType": "client-secret",
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "bff-client",
+      "name": "BFF Client (Sample C)",
+      "description": "BFF que valida token do usuário e usa Client Credentials para chamar o docs-service",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "NdZZhMqZmZcsQhsvUequiwpWCLXD2urt",
+      "clientAuthenticatorType": "client-secret",
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocol": "openid-connect",
+      "redirectUris": [],
+      "webOrigins": []
+    },
+    {
+      "clientId": "docs-service",
+      "name": "Docs Service (Sample C)",
+      "description": "Serviço downstream que aceita apenas tokens emitidos para o bff-client",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "GUaoDIgzsi4FzDF864bpn2PxPemGtBsh",
+      "clientAuthenticatorType": "client-secret",
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [],
+      "webOrigins": []
+    }
+  ],
+
+  "users": [
+    {
+      "username": "alice",
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alice123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "bob",
+      "email": "bob@example.com",
+      "firstName": "Bob",
+      "lastName": "Editor",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bob123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["editor"]
+    },
+    {
+      "username": "carol",
+      "email": "carol@example.com",
+      "firstName": "Carol",
+      "lastName": "Viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "carol123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["viewer"]
+    }
+  ]
+}
