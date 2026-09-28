@@ -50,14 +50,33 @@ services:
     networks:
       - keycloak-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.0\r\n\r\n' >&3 && grep -q 'UP' <&3"]
       interval: 10s
       timeout: 5s
       retries: 15
       start_period: 60s
 
-  # ── Samples serão adicionados aqui conforme cada Epic for implementado ──────
-  # api-simples   → Epic 2 (Card 5)
+  api-simples:
+    build:
+      context: ./samples/api-simples
+    container_name: api-simples
+    ports:
+      - "8001:8001"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      REALM: distributed-systems
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Samples adicionais serão incluídos abaixo ──────
   # frontend-pkce → Epic 3 (Card 10)
   # bff + docs-service → Epic 4 (Card 18)
 

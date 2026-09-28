@@ -336,11 +336,11 @@ Descrição: Obter um token real do Keycloak para cada usuário (`alice`, `bob`,
 
 # [*] Epic 2 — Sample A: API Simples
 
-## [*] Card 5 — Estrutura base da api-simples
+## [OK] Card 5 — Estrutura base da api-simples
 
 Descrição: Criar a estrutura inicial do Sample A: FastAPI com dados de documentos em memória (sem banco — o foco é auth, não persistência). Cada documento tem `id`, `title`, `owner_id` e `content`. Implementar os endpoints listados na seção de Domínio, por enquanto sem qualquer proteção. Subir no Docker Compose na porta 8001.
 
-## [*] Card 6 — Middleware de autenticação via JWKS
+## [OK] Card 6 — Middleware de autenticação via JWKS
 
 Descrição: Implementar em `auth.py` um middleware FastAPI que: (1) extrai o Bearer token do header `Authorization`; (2) busca a chave pública do Keycloak via `GET /.well-known/openid-configuration` → `jwks_uri`; (3) valida a assinatura do token localmente usando `python-jose`; (4) retorna HTTP 401 se o token for inválido ou expirado. A chave pública deve ser cacheada em memória (não buscar no Keycloak a cada requisição).
 
