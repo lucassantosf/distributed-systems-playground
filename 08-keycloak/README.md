@@ -334,7 +334,7 @@ Descrição: Obter um token real do Keycloak para cada usuário (`alice`, `bob`,
 
 ---
 
-# [*] Epic 2 — Sample A: API Simples
+# [OK] Epic 2 — Sample A: API Simples
 
 ## [OK] Card 5 — Estrutura base da api-simples
 
@@ -344,15 +344,15 @@ Descrição: Criar a estrutura inicial do Sample A: FastAPI com dados de documen
 
 Descrição: Implementar em `auth.py` um middleware FastAPI que: (1) extrai o Bearer token do header `Authorization`; (2) busca a chave pública do Keycloak via `GET /.well-known/openid-configuration` → `jwks_uri`; (3) valida a assinatura do token localmente usando `python-jose`; (4) retorna HTTP 401 se o token for inválido ou expirado. A chave pública deve ser cacheada em memória (não buscar no Keycloak a cada requisição).
 
-## [*] Card 7 — RBAC nos endpoints
+## [OK] Card 7 — RBAC nos endpoints
 
 Descrição: Extrair o campo `realm_access.roles` do payload do JWT e aplicar controle de acesso nos endpoints: `GET /documents` retorna todos os documentos para `admin` e apenas os próprios para `editor`/`viewer`; `POST /documents` exige role `editor` ou `admin`; `DELETE /documents/{id}` exige role `admin`. Retornar HTTP 403 quando o usuário está autenticado mas não tem a role necessária.
 
-## [*] Card 8 — Testar com curl os três usuários
+## [OK] Card 8 — Testar com curl os três usuários
 
-Descrição: Criar um script `samples/api-simples/scripts/test_rbac.sh` que: obtém tokens para `alice`, `bob` e `carol`; testa cada endpoint com cada usuário; e valida os códigos de resposta esperados (ex: `carol` fazendo `POST` deve receber 403, `alice` fazendo `GET /documents` deve receber todos os documentos). Documentar a saída esperada no script.
+Descrição: Criar um script `scripts/test_rbac.sh` que: obtém tokens para `alice`, `bob` e `carol`; testa cada endpoint com cada usuário; e valida os códigos de resposta esperados (ex: `carol` fazendo `POST` deve receber 403, `alice` fazendo `GET /documents` deve receber todos os documentos). O script descobre os IDs de documentos dinamicamente para ser resiliente a dados mutáveis entre execuções.
 
-## [*] Card 9 — 401 vs 403 — semantica correta
+## [OK] Card 9 — 401 vs 403 — semantica correta
 
 Descrição: Garantir que a API usa a semântica HTTP correta: `401 Unauthorized` quando não há token ou o token é inválido/expirado ("não sei quem você é"); `403 Forbidden` quando o token é válido mas o usuário não tem permissão ("sei quem você é, mas não pode fazer isso"). Adicionar mensagens de erro padronizadas com o campo `detail` explicando o motivo.
 

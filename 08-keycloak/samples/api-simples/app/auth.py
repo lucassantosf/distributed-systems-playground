@@ -149,3 +149,46 @@ async def get_current_user(
 def extract_roles(current_user: dict) -> list[str]:
     """Extrai as realm roles do payload do JWT."""
     return current_user.get("realm_access", {}).get("roles", [])
+
+
+def has_role(current_user: dict, *roles: str) -> bool:
+    """Verifica se o usuário possui ao menos uma das roles informadas."""
+    user_roles = extract_roles(current_user)
+    return any(r in user_roles for r in roles)
+
+
+# ── Dependency de autorização (Card 7) ───────────────────────────────────────
+
+def require_roles(*roles: str):
+    """
+    Factory de dependency FastAPI que exige ao menos uma das roles informadas.
+
+    Uso nos endpoints:
+        current_user: dict = Depends(require_roles("admin", "editor"))
+
+    Fluxo:
+      1. Valida o JWT via get_current_user (herda o 401 de autenticação)
+      2. Extrai realm_access.roles do payload
+      3. Verifica se o usuário possui ao menos uma das roles requeridas
+      4. Retorna os claims se OK → lança 403 se não tiver permissão
+
+    Distinção semântica HTTP:
+      401 Unauthorized → "não sei quem você é" (sem token ou token inválido)
+      403 Forbidden    → "sei quem você é, mas não pode fazer isso" (role insuficiente)
+    """
+    async def dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        user_roles = extract_roles(current_user)
+        if not any(r in user_roles for r in roles):
+            username = current_user.get("preferred_username", "desconhecido")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Acesso negado para '{username}'. "
+                    f"Roles necessárias: {list(roles)}. "
+                    f"Suas roles: {user_roles}."
+                ),
+            )
+        return current_user
+
+    return dependency
+

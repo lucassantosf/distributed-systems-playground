@@ -1,9 +1,33 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth import get_current_user
+from app.auth import get_current_user, has_role, require_roles
 from app.schemas.document import DocumentCreate, DocumentResponse
+from app.schemas.error import ErrorResponse
 
 router = APIRouter()
+
+# ── Respostas de erro reutilizáveis ────────────────────────────────────────────
+# Declaradas aqui para não repetir em cada endpoint.
+# Aparecem no Swagger UI (http://localhost:8001/docs) como respostas documentadas.
+
+_AUTH_RESPONSES = {
+    401: {
+        "model": ErrorResponse,
+        "description": (
+            "**401 Unauthorized** — Não sei quem você é.\n\n"
+            "Causas: token ausente, malformado, expirado ou com assinatura inválida.\n"
+            "O header `WWW-Authenticate: Bearer` é incluído na resposta."
+        ),
+    },
+    403: {
+        "model": ErrorResponse,
+        "description": (
+            "**403 Forbidden** — Sei quem você é, mas não pode fazer isso.\n\n"
+            "Token válido, porém o usuário não tem a role necessária "
+            "ou não é dono do recurso solicitado."
+        ),
+    },
+}
 
 # Dados em memória para demonstração (foco é auth, não persistência)
 DOCUMENTS_DB: list[dict] = [
@@ -30,75 +54,161 @@ DOCUMENTS_DB: list[dict] = [
 _next_id = 4
 
 
-@router.get("/documents", response_model=list[DocumentResponse])
+# ── GET /documents ─────────────────────────────────────────────────────────────
+
+@router.get(
+    "/documents",
+    response_model=list[DocumentResponse],
+    responses=_AUTH_RESPONSES,
+    summary="Listar documentos (filtrado por role)",
+)
 async def list_documents(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Lista documentos. Requer autenticação.
-    Card 6: todos os documentos são retornados para qualquer usuário autenticado.
-    Card 7 vai filtrar por role (admin vê todos; editor/viewer veem apenas os próprios).
+    Lista documentos com filtro por role:
+    - **admin**  → retorna TODOS os documentos
+    - **editor** → retorna apenas os documentos cujo `owner_id == sub` do token
+    - **viewer** → idem editor
+
+    > 401 se sem token ou token inválido · 403 nunca ocorre aqui (qualquer role acessa)
     """
-    return DOCUMENTS_DB
+    if has_role(current_user, "admin"):
+        return DOCUMENTS_DB
+
+    user_sub = current_user["sub"]
+    return [d for d in DOCUMENTS_DB if d["owner_id"] == user_sub]
 
 
-@router.post("/documents", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+# ── POST /documents ─────────────────────────────────────────────────────────────
+
+@router.post(
+    "/documents",
+    response_model=DocumentResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses=_AUTH_RESPONSES,
+    summary="Criar documento (editor ou admin)",
+)
 async def create_document(
     doc: DocumentCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_roles("admin", "editor")),
 ):
     """
-    Cria documento. owner_id é preenchido automaticamente via sub do JWT.
-    Card 7 vai restringir este endpoint a roles editor/admin.
+    Cria documento. Requer role **editor** ou **admin**.
+
+    - `owner_id` é preenchido automaticamente com o `sub` do JWT (não enviado no body).
+    - **viewer** recebe `403 Forbidden`.
+
+    > 401 se sem token ou token inválido · 403 se role for viewer
     """
     global _next_id
     new_doc = {
         "id": _next_id,
         "title": doc.title,
         "content": doc.content,
-        "owner_id": current_user["sub"],  # Sub do JWT = ID único do usuário
+        "owner_id": current_user["sub"],
     }
     _next_id += 1
     DOCUMENTS_DB.append(new_doc)
     return new_doc
 
 
-@router.get("/documents/{doc_id}", response_model=DocumentResponse)
+# ── GET /documents/{id} ─────────────────────────────────────────────────────────
+
+@router.get(
+    "/documents/{doc_id}",
+    response_model=DocumentResponse,
+    responses={
+        **_AUTH_RESPONSES,
+        404: {"model": ErrorResponse, "description": "Documento não encontrado."},
+    },
+    summary="Buscar documento por ID",
+)
 async def get_document(
     doc_id: int,
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Busca documento por ID. Requer autenticação.
-    Card 7 vai restringir: não-admin só acessa documentos próprios.
+    Busca documento por ID.
+    - **admin**  → acessa qualquer documento
+    - **editor** → acessa apenas documentos próprios (`403` se não for dono)
+    - **viewer** → idem editor
+
+    > 401 se sem token ou token inválido · 403 se editor/viewer acessar doc alheio · 404 se não existir
     """
-    for d in DOCUMENTS_DB:
-        if d["id"] == doc_id:
-            return d
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento não encontrado")
+    doc = next((d for d in DOCUMENTS_DB if d["id"] == doc_id), None)
+
+    if doc is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Documento {doc_id} não encontrado.",
+        )
+
+    if has_role(current_user, "admin"):
+        return doc
+
+    if doc["owner_id"] != current_user["sub"]:
+        username = current_user.get("preferred_username", "?")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Acesso negado para '{username}'. "
+                "Este documento pertence a outro usuário."
+            ),
+        )
+
+    return doc
 
 
-@router.delete("/documents/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)
+# ── DELETE /documents/{id} ─────────────────────────────────────────────────────
+
+@router.delete(
+    "/documents/{doc_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        **_AUTH_RESPONSES,
+        404: {"model": ErrorResponse, "description": "Documento não encontrado."},
+    },
+    summary="Remover documento (somente admin)",
+)
 async def delete_document(
     doc_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_roles("admin")),
 ):
     """
-    Remove documento. Requer autenticação.
-    Card 7 vai restringir este endpoint a role admin.
+    Remove documento. Requer role **admin**.
+
+    - **editor** e **viewer** recebem `403 Forbidden`.
+
+    > 401 se sem token ou token inválido · 403 se não for admin · 404 se não existir
     """
     for idx, d in enumerate(DOCUMENTS_DB):
         if d["id"] == doc_id:
             DOCUMENTS_DB.pop(idx)
             return
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento não encontrado")
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Documento {doc_id} não encontrado.",
+    )
 
 
-@router.get("/me")
+# ── GET /me ────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/me",
+    responses={
+        401: _AUTH_RESPONSES[401],
+    },
+    summary="Inspecionar token (claims do JWT atual)",
+)
 async def get_me(current_user: dict = Depends(get_current_user)):
     """
-    Retorna os claims do token JWT do usuário autenticado.
-    Útil para debugar e entender o que o token contém.
+    Retorna os claims relevantes do JWT do usuário autenticado.
+
+    Útil para verificar qual `sub`, quais `roles` e qual `email` estão no token.
+
+    > 401 se sem token ou token inválido · nunca retorna 403 (qualquer autenticado acessa)
     """
     roles = current_user.get("realm_access", {}).get("roles", [])
     return {
