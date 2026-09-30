@@ -65,6 +65,8 @@ services:
     environment:
       KEYCLOAK_URL: http://keycloak:8080
       REALM: distributed-systems
+    volumes:
+      - ./samples/api-simples/app:/app/app
     depends_on:
       keycloak:
         condition: service_healthy
@@ -76,8 +78,22 @@ services:
       timeout: 3s
       retries: 5
 
+  frontend-pkce:
+    build:
+      context: ./samples/frontend-pkce
+    container_name: frontend-pkce
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://api-simples:8001
+    volumes:
+      - ./samples/frontend-pkce/src:/app/src
+    depends_on:
+      - api-simples
+    networks:
+      - keycloak-net
+
   # ── Samples adicionais serão incluídos abaixo ──────
-  # frontend-pkce → Epic 3 (Card 10)
   # bff + docs-service → Epic 4 (Card 18)
 
 networks:

@@ -360,15 +360,15 @@ Descrição: Garantir que a API usa a semântica HTTP correta: `401 Unauthorized
 
 # [*] Epic 3 — Sample B: Frontend PKCE
 
-## [*] Card 10 — Estrutura base do frontend React + Vite
+## [OK] Card 10 — Estrutura base do frontend React + Vite
 
 Descrição: Criar a estrutura inicial do Sample B: React 18 + Vite 5 + TypeScript. Configurar o Vite com proxy para `/api` apontando para a `api-simples` (porta 8001). Criar a UI base com duas áreas: uma para o estado de autenticação (botão de login/logout, nome do usuário) e outra para a lista de documentos. Subir no Docker Compose na porta 5173.
 
-## [*] Card 11 — PKCE manual: code_verifier e code_challenge
+## [OK] Card 11 — PKCE manual: code_verifier e code_challenge
 
 Descrição: Implementar em `src/auth/pkce.ts` a geração do par PKCE: `code_verifier` (string aleatória de 43-128 caracteres) e `code_challenge` (SHA-256 do verifier, codificado em base64url). Implementar também a construção da URL de autorização com os parâmetros `response_type=code`, `client_id`, `redirect_uri`, `scope=openid profile`, `state` (anti-CSRF), `code_challenge` e `code_challenge_method=S256`. Exibir cada passo na tela com fins didáticos.
 
-## [*] Card 12 — Redirect para login e captura do authorization code
+## [OK] Card 12 — Redirect para login e captura do authorization code
 
 Descrição: Implementar o botão "Entrar" que redireciona o browser para a URL de autorização construída no Card 11. Após o Keycloak autenticar o usuário, ele redireciona de volta para a aplicação com `?code=...&state=...` na URL. Implementar a captura desses parâmetros no callback, validar o `state` (anti-CSRF) e armazenar o `code` temporariamente para a próxima etapa.
 
