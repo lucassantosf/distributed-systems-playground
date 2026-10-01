@@ -173,36 +173,53 @@ O domínio adotado é o de **documentos** — propositalmente simples para não 
 │
 ├── keycloak/
 │   └── realm-export.json           # Realm configurado como código (IaC)
-│                                   # Importado automaticamente no startup
+│                                   # Importado automaticamente no startup (Card 3)
+│
+├── scripts/                        # Scripts utilitários e suíte de testes
+│   ├── decode_tokens.py            # Card 4: inspeciona JWTs de alice, bob e carol
+│   ├── test_rbac.sh                # Card 8: suíte de testes automatizada de RBAC (25/25 ✓)
+│   └── validate_all_samples.sh     # Card 26: script de validação de todos os samples
 │
 └── samples/
     │
-    ├── api-simples/                # Sample A — FastAPI protegida por JWT
+    ├── api-simples/                # Sample A — FastAPI protegida por JWT (Épico 2)
     │   ├── Dockerfile
     │   ├── requirements.txt
     │   └── app/
-    │       ├── main.py
+    │       ├── main.py             # FastAPI app + handler customizado de 422
     │       ├── config.py           # KEYCLOAK_URL, REALM, CLIENT_ID via env
-    │       ├── auth.py             # Middleware JWKS + extração de roles
+    │       ├── auth.py             # Middleware JWKS + extração de roles (Card 6/7)
+    │       ├── schemas/
+    │       │   ├── document.py     # Pydantic schemas de criação e resposta
+    │       │   └── error.py        # Schema ErrorResponse padronizado (Card 9)
     │       └── routers/
-    │           └── documents.py   # CRUD de documentos com RBAC
+    │           └── documents.py    # CRUD de documentos com RBAC (Card 7/9)
     │
-    ├── frontend-pkce/              # Sample B — React com PKCE manual
+    ├── frontend-pkce/              # Sample B — React + Vite com PKCE manual (Épico 3)
     │   ├── Dockerfile
     │   ├── package.json
-    │   ├── vite.config.ts
+    │   ├── tsconfig.json
+    │   ├── vite.config.ts          # Proxy /api -> api-simples:8001 + polling HMR
+    │   ├── index.html
     │   └── src/
     │       ├── main.tsx
-    │       ├── App.tsx
+    │       ├── App.tsx             # Layout principal e gerenciador de estado
+    │       ├── index.css
     │       ├── auth/
-    │       │   ├── pkce.ts         # Geração de code_verifier / code_challenge
-    │       │   └── tokens.ts      # Troca de code, refresh, logout
+    │       │   ├── pkce.ts         # Card 11: code_verifier e SHA-256 code_challenge
+    │       │   ├── callback.ts     # Card 12: captura de code e validação anti-CSRF state
+    │       │   ├── tokens.ts       # Card 13/16/17: troca de code, refresh e logout
+    │       │   └── api.ts          # Card 16: interceptor fetchWithAuth com auto-refresh
     │       └── components/
-    │           ├── LoginButton.tsx
-    │           ├── TokenViewer.tsx # Exibe claims decodificados (didático)
-    │           └── DocumentsList.tsx
+    │           ├── Header.tsx      # Barra de navegação com badge e login/logout
+    │           ├── AuthStateCard.tsx  # Card de estado da sessão
+    │           ├── DocumentsCard.tsx  # Card 15: lista e criação de documentos
+    │           ├── PKCEDebugCard.tsx  # Card 11: gerador e inspecionador PKCE
+    │           ├── CallbackDebugCard.tsx # Card 12: inspecionador de callback
+    │           ├── TokenViewer.tsx # Card 13/14: inspecionador de claims e JWTs
+    │           └── RefreshLogCard.tsx    # Card 16: log de renovação de refresh token
     │
-    └── bff-m2m/                   # Sample C — BFF + downstream (M2M)
+    └── bff-m2m/                   # Sample C — BFF + downstream (M2M) (Épico 4)
         ├── bff/
         │   ├── Dockerfile
         │   ├── requirements.txt
@@ -271,11 +288,14 @@ open http://localhost:8080/admin
 # 5. Acessar os samples
 open http://localhost:5173    # Frontend PKCE (Sample B)
 
-# 6. Testar a api-simples com curl (Sample A)
+# 6. Rodar suíte de testes de RBAC da api-simples (Sample A)
+bash scripts/test_rbac.sh
+
+# 7. Testar a api-simples com curl manualmente
 # Obter token para alice (admin):
 TOKEN=$(curl -s -X POST \
   "http://localhost:8080/realms/distributed-systems/protocol/openid-connect/token" \
-  -d "grant_type=password&client_id=api-simples&username=alice&password=alice123" \
+  -d "grant_type=password&client_id=api-simples&client_secret=GZYImUZPV2W7tWzsQKTbpzdNFI2eLdGC&username=alice&password=alice123" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/documents
@@ -358,7 +378,7 @@ Descrição: Garantir que a API usa a semântica HTTP correta: `401 Unauthorized
 
 ---
 
-# [*] Epic 3 — Sample B: Frontend PKCE
+# [OK] Epic 3 — Sample B: Frontend PKCE
 
 ## [OK] Card 10 — Estrutura base do frontend React + Vite
 
@@ -372,23 +392,23 @@ Descrição: Implementar em `src/auth/pkce.ts` a geração do par PKCE: `code_ve
 
 Descrição: Implementar o botão "Entrar" que redireciona o browser para a URL de autorização construída no Card 11. Após o Keycloak autenticar o usuário, ele redireciona de volta para a aplicação com `?code=...&state=...` na URL. Implementar a captura desses parâmetros no callback, validar o `state` (anti-CSRF) e armazenar o `code` temporariamente para a próxima etapa.
 
-## [*] Card 13 — Troca do code pelos tokens
+## [OK] Card 13 — Troca do code pelos tokens
 
 Descrição: Implementar em `src/auth/tokens.ts` a troca do authorization code pelos tokens: `POST` para o endpoint `/token` do Keycloak com `grant_type=authorization_code`, `code`, `redirect_uri`, `client_id` e `code_verifier` (o segredo do PKCE). Armazenar `access_token`, `refresh_token` e `id_token` na memória (não em localStorage por segurança). Exibir os três tokens decodificados na `TokenViewer` component.
 
-## [*] Card 14 — TokenViewer: inspecionar claims na UI
+## [OK] Card 14 — TokenViewer: inspecionar claims na UI
 
 Descrição: Criar o componente `TokenViewer.tsx` que decodifica (sem verificar assinatura — apenas base64) e exibe os claims de cada token de forma legível: nome do usuário, email, roles, `sub`, `exp` (formatado como data), `iss`. Destacar visualmente a diferença entre o que o Access Token e o ID Token contêm. Objetivo didático: deixar o conteúdo do JWT visível e tangível.
 
-## [*] Card 15 — Chamar a api-simples autenticado
+## [OK] Card 15 — Chamar a api-simples autenticado
 
 Descrição: Implementar `DocumentsList.tsx` que chama `GET /api/documents` com o Access Token no header `Authorization: Bearer <token>`. Exibir os documentos retornados. Testar com os três usuários (alice, bob, carol) e observar a diferença no resultado: alice vê todos, bob e carol veem apenas os próprios. Tratar erros de 401 e 403 com mensagens claras na UI.
 
-## [*] Card 16 — Refresh token automático
+## [OK] Card 16 — Refresh token automático
 
 Descrição: Implementar a renovação automática do Access Token usando o Refresh Token. Quando uma chamada à API retorna 401 (token expirado), o cliente deve automaticamente fazer `POST /token` com `grant_type=refresh_token` e o refresh token atual, trocar pelos novos tokens e repetir a chamada original sem intervenção do usuário. Exibir na UI quando um refresh aconteceu (para fins didáticos).
 
-## [*] Card 17 — Logout com invalidação no Keycloak
+## [OK] Card 17 — Logout com invalidação no Keycloak
 
 Descrição: Implementar o botão "Sair" que: (1) chama o endpoint `/logout` do Keycloak com o `refresh_token` para invalidar a sessão no servidor; (2) limpa os tokens da memória local; (3) redireciona para a tela inicial. Demonstrar que após o logout, o refresh token não funciona mais (diferente de apenas apagar o token local, onde o refresh ainda seria válido até expirar).
 
