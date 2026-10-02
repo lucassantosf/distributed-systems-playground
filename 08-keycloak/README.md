@@ -416,11 +416,11 @@ Descrição: Implementar o botão "Sair" que: (1) chama o endpoint `/logout` do 
 
 # [*] Epic 4 — Sample C: BFF + M2M
 
-## [*] Card 18 — Estrutura base do BFF e do docs-service
+## [OK] Card 18 — Estrutura base do BFF e do docs-service
 
 Descrição: Criar os dois serviços do Sample C: `bff` (porta 8002) e `docs-service` (porta 8003). O `bff` expõe endpoints em `/bff/*` que o usuário externo chama; o `docs-service` expõe endpoints em `/internal/*` que só o BFF pode chamar (não expostos diretamente ao usuário). Ambos sobem no Docker Compose. Por enquanto sem autenticação — apenas a estrutura de rotas e dados de exemplo em memória.
 
-## [*] Card 19 — BFF valida token do usuário
+## [OK] Card 19 — BFF valida token do usuário
 
 Descrição: Implementar no BFF o mesmo middleware de validação JWT do Sample A (JWKS, validação local, extração de roles). O BFF deve rejeitar chamadas sem token válido com 401, e aplicar RBAC básico (admin vs editor vs viewer) no que expõe ao usuário. A partir deste card, o BFF sabe quem é o usuário que está chamando.
 

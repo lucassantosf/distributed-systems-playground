@@ -93,8 +93,56 @@ services:
     networks:
       - keycloak-net
 
-  # ── Samples adicionais serão incluídos abaixo ──────
-  # bff + docs-service → Epic 4 (Card 18)
+  # ── Epic 4 — Sample C: BFF + M2M ──────────────────
+  bff:
+    build:
+      context: ./samples/bff-m2m/bff
+    container_name: bff
+    ports:
+      - "8002:8002"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      REALM: distributed-systems
+      CLIENT_ID: bff-client
+      CLIENT_SECRET: NdZZhMqZmZcsQhsvUequiwpWCLXD2urt
+      DOCS_SERVICE_URL: http://docs-service:8003
+    volumes:
+      - ./samples/bff-m2m/bff/app:/app/app
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  docs-service:
+    build:
+      context: ./samples/bff-m2m/docs-service
+    container_name: docs-service
+    ports:
+      - "8003:8003"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URL: http://localhost:8080
+      REALM: distributed-systems
+      EXPECTED_CLIENT_ID: bff-client
+    volumes:
+      - ./samples/bff-m2m/docs-service/app:/app/app
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    networks:
+      - keycloak-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 networks:
   keycloak-net:
