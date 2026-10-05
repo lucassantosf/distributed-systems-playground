@@ -1,65 +1,51 @@
 """
-bff/app/routers/bff.py — Card 19: Endpoints do BFF protegidos por JWT e RBAC
+bff/app/routers/bff.py — Card 20: Endpoints do BFF integrados ao docs-service via M2M
 
-O BFF recebe o Bearer token do usuário final, valida localmente via JWKS
-e aplica as regras de controle de acesso (RBAC).
-
-Regras de RBAC no BFF:
-  - admin: visualiza todos os documentos, cria documentos e busca qualquer ID.
-  - editor: visualiza apenas documentos próprios, cria novos documentos.
-  - viewer: visualiza apenas documentos próprios, não pode criar (403).
+Fluxo completo:
+  1. Usuário externo envia requisição para o BFF com Bearer Token de usuário.
+  2. BFF valida o token do usuário via JWKS (Card 19) e extrai roles e sub.
+  3. BFF obtém/reutiliza token de serviço via Client Credentials (Card 20).
+  4. BFF chama o docs-service (/internal/*) usando o token de serviço.
+  5. BFF aplica regras de autorização/RBAC sobre o resultado retornado pelo docs-service.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth import extract_roles, get_current_user, has_role, require_roles
-from app.schemas.document import DocumentCreate, DocumentResponse
+from app.auth import extract_roles, get_current_user, has_role
+from app.clients.docs_client import docs_client
+from app.schemas.document import DocumentResponse
 from app.schemas.error import ErrorResponse
 
 router = APIRouter(prefix="/bff", tags=["BFF"])
 
-# ── Respostas padrão para documentação OpenAPI ────────────────────────────────
+# ── Respostas documentadas para OpenAPI ───────────────────────────────────────
 _AUTH_RESPONSES = {
     401: {
         "model": ErrorResponse,
         "description": (
-            "**401 Unauthorized** — Token de autenticação ausente, expirado ou inválido.\n\n"
+            "**401 Unauthorized** — Token do usuário ausente, expirado ou inválido.\n\n"
             "Inclui o header `WWW-Authenticate: Bearer`."
         ),
     },
     403: {
         "model": ErrorResponse,
         "description": (
-            "**403 Forbidden** — Usuário autenticado, porém sem permissão suficiente "
-            "ou tentando acessar documento de outro usuário."
+            "**403 Forbidden** — Usuário autenticado, porém sem permissão para acessar o recurso solicitado."
+        ),
+    },
+    502: {
+        "model": ErrorResponse,
+        "description": (
+            "**502 Bad Gateway** — Falha de comunicação entre o BFF e o docs-service downstream."
+        ),
+    },
+    503: {
+        "model": ErrorResponse,
+        "description": (
+            "**503 Service Unavailable** — Keycloak indisponível para validação JWKS ou emissão de token de serviço."
         ),
     },
 }
-
-# Base de dados em memória para demonstração no Sample C (Card 18/19)
-# No Card 20, as consultas serão repassadas ao docs-service via M2M Client Credentials
-SAMPLE_DOCUMENTS: list[dict] = [
-    {
-        "id": 1,
-        "title": "Relatório de Arquitetura",
-        "content": "Documento de arquitetura de sistemas distribuídos.",
-        "owner_id": "5d0cca8a-69f3-45de-9620-19ae469f06e9",  # Alice (admin)
-    },
-    {
-        "id": 2,
-        "title": "Proposta de Projeto",
-        "content": "Rascunho da proposta comercial para o cliente X.",
-        "owner_id": "e5fdac7a-c5e2-4945-aa9f-aeba150d897a",  # Bob (editor)
-    },
-    {
-        "id": 3,
-        "title": "Guia de Boas Práticas",
-        "content": "Instruções para revisão de código, padrões e testes.",
-        "owner_id": "8c02af90-09e9-4d22-870a-72df2d19aecb",  # Carol (viewer)
-    },
-]
-
-_next_id = 4
 
 
 # ── GET /bff/documents ────────────────────────────────────────────────────────
@@ -68,55 +54,25 @@ _next_id = 4
     "/documents",
     response_model=list[DocumentResponse],
     responses=_AUTH_RESPONSES,
-    summary="Listar documentos (filtrado por role do usuário)",
+    summary="Listar documentos (BFF → docs-service via M2M + filtro RBAC)",
 )
 async def list_documents(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Lista documentos para o usuário autenticado:
-    - **admin**  → retorna todos os documentos.
-    - **editor** → retorna apenas os documentos do próprio usuário (`owner_id == sub`).
-    - **viewer** → retorna apenas os documentos do próprio usuário (`owner_id == sub`).
-
-    > Rejeita requisições sem token válido com HTTP 401.
+    1. Valida o token JWT do usuário no BFF.
+    2. Busca todos os documentos no docs-service interno via token de serviço M2M (Client Credentials).
+    3. Aplica filtro baseado na role do usuário:
+       - **admin**: recebe todos os documentos.
+       - **editor** / **viewer**: recebe apenas documentos de sua propriedade (`owner_id == sub`).
     """
+    all_documents = await docs_client.get_documents()
+
     if has_role(current_user, "admin"):
-        return SAMPLE_DOCUMENTS
+        return all_documents
 
     user_sub = current_user["sub"]
-    return [doc for doc in SAMPLE_DOCUMENTS if doc["owner_id"] == user_sub]
-
-
-# ── POST /bff/documents ───────────────────────────────────────────────────────
-
-@router.post(
-    "/documents",
-    response_model=DocumentResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses=_AUTH_RESPONSES,
-    summary="Criar documento (editor ou admin)",
-)
-async def create_document(
-    doc: DocumentCreate,
-    current_user: dict = Depends(require_roles("admin", "editor")),
-):
-    """
-    Cria um novo documento. Requer role **editor** ou **admin**.
-    O `owner_id` é atribuído automaticamente a partir do `sub` do JWT do usuário.
-
-    > Retorna 403 Forbidden para usuários com role viewer.
-    """
-    global _next_id
-    new_doc = {
-        "id": _next_id,
-        "title": doc.title,
-        "content": doc.content,
-        "owner_id": current_user["sub"],
-    }
-    _next_id += 1
-    SAMPLE_DOCUMENTS.append(new_doc)
-    return new_doc
+    return [doc for doc in all_documents if doc.get("owner_id") == user_sub]
 
 
 # ── GET /bff/documents/{doc_id} ───────────────────────────────────────────────
@@ -128,18 +84,20 @@ async def create_document(
         **_AUTH_RESPONSES,
         404: {"model": ErrorResponse, "description": "Documento não encontrado."},
     },
-    summary="Buscar documento por ID (via BFF)",
+    summary="Buscar documento por ID (BFF → docs-service via M2M)",
 )
 async def get_document(
     doc_id: int,
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Busca um documento específico por ID:
-    - **admin**  → pode visualizar qualquer documento.
-    - **editor** / **viewer** → acessa somente o documento se for o proprietário.
+    1. Valida o token JWT do usuário no BFF.
+    2. Busca o documento no docs-service interno usando o token de serviço M2M.
+    3. Aplica regras de autorização:
+       - **admin**: pode acessar qualquer documento.
+       - **editor** / **viewer**: acessa apenas se for proprietário (`403` se pertencer a outro usuário).
     """
-    doc = next((d for d in SAMPLE_DOCUMENTS if d["id"] == doc_id), None)
+    doc = await docs_client.get_document_by_id(doc_id)
     if doc is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -149,7 +107,7 @@ async def get_document(
     if has_role(current_user, "admin"):
         return doc
 
-    if doc["owner_id"] != current_user["sub"]:
+    if doc.get("owner_id") != current_user["sub"]:
         username = current_user.get("preferred_username", "desconhecido")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -171,8 +129,7 @@ async def get_document(
 )
 async def get_me(current_user: dict = Depends(get_current_user)):
     """
-    Retorna os claims extraídos do token JWT do usuário autenticado.
-    Permite validar que o BFF identifica corretamente `sub`, `username` e `roles`.
+    Retorna os claims extraídos do token JWT do usuário autenticado no BFF.
     """
     return {
         "sub": current_user.get("sub"),

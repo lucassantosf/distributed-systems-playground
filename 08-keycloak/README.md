@@ -424,7 +424,7 @@ Descrição: Criar os dois serviços do Sample C: `bff` (porta 8002) e `docs-ser
 
 Descrição: Implementar no BFF o mesmo middleware de validação JWT do Sample A (JWKS, validação local, extração de roles). O BFF deve rejeitar chamadas sem token válido com 401, e aplicar RBAC básico (admin vs editor vs viewer) no que expõe ao usuário. A partir deste card, o BFF sabe quem é o usuário que está chamando.
 
-## [*] Card 20 — BFF obtém token próprio via Client Credentials
+## [OK] Card 20 — BFF obtém token próprio via Client Credentials
 
 Descrição: Implementar em `bff/app/clients/docs_client.py` a obtenção de um token de serviço usando Client Credentials: `POST /token` com `grant_type=client_credentials`, `client_id=bff-client` e `client_secret`. O BFF deve cachear esse token em memória e renová-lo apenas quando expirar (sem buscar um novo a cada requisição). Usar esse token de serviço para chamar o `docs-service`.
 
