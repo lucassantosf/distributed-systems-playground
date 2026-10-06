@@ -1,6 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth import get_current_user, has_role, require_roles
+from app.auth import (
+    extract_scopes,
+    get_current_user,
+    get_current_user_introspect,
+    has_role,
+    require_roles,
+    require_scopes,
+)
 from app.schemas.document import DocumentCreate, DocumentResponse
 from app.schemas.error import ErrorResponse
 
@@ -23,8 +30,8 @@ _AUTH_RESPONSES = {
         "model": ErrorResponse,
         "description": (
             "**403 Forbidden** — Sei quem você é, mas não pode fazer isso.\n\n"
-            "Token válido, porém o usuário não tem a role necessária "
-            "ou não é dono do recurso solicitado."
+            "Token válido, porém o usuário não tem a role necessária, "
+            "o token não possui o scope necessário, ou o usuário não é dono do recurso."
         ),
     },
 }
@@ -60,18 +67,47 @@ _next_id = 4
     "/documents",
     response_model=list[DocumentResponse],
     responses=_AUTH_RESPONSES,
-    summary="Listar documentos (filtrado por role)",
+    summary="Listar documentos (validação local via JWKS)",
 )
 async def list_documents(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Lista documentos com filtro por role:
+    Lista documentos com filtro por role usando **validação local via JWKS**.
     - **admin**  → retorna TODOS os documentos
     - **editor** → retorna apenas os documentos cujo `owner_id == sub` do token
     - **viewer** → idem editor
 
     > 401 se sem token ou token inválido · 403 nunca ocorre aqui (qualquer role acessa)
+    """
+    if has_role(current_user, "admin"):
+        return DOCUMENTS_DB
+
+    user_sub = current_user["sub"]
+    return [d for d in DOCUMENTS_DB if d["owner_id"] == user_sub]
+
+
+# ── GET /documents-introspect (Card 24) ───────────────────────────────────────
+
+@router.get(
+    "/documents-introspect",
+    response_model=list[DocumentResponse],
+    responses={
+        **_AUTH_RESPONSES,
+        503: {"model": ErrorResponse, "description": "Keycloak inacessível para Token Introspection."},
+    },
+    summary="Listar documentos (validação remota via Token Introspection RFC 7662)",
+)
+async def list_documents_introspect(
+    current_user: dict = Depends(get_current_user_introspect),
+):
+    """
+    Lista documentos com filtro por role usando **Token Introspection (RFC 7662)**.
+
+    Diferença vs GET /documents:
+    - **GET /documents**: valida localmente via JWKS em memória (< 5ms).
+    - **GET /documents-introspect**: consulta o Keycloak via POST /token/introspect a cada requisição.
+      Permite revogação instantânea de sessão ao custo de uma chamada HTTP adicional por request.
     """
     if has_role(current_user, "admin"):
         return DOCUMENTS_DB
@@ -87,19 +123,21 @@ async def list_documents(
     response_model=DocumentResponse,
     status_code=status.HTTP_201_CREATED,
     responses=_AUTH_RESPONSES,
-    summary="Criar documento (editor ou admin)",
+    summary="Criar documento (editor ou admin com scope documents:write)",
 )
 async def create_document(
     doc: DocumentCreate,
     current_user: dict = Depends(require_roles("admin", "editor")),
+    _: dict = Depends(require_scopes("documents:write")),
 ):
     """
-    Cria documento. Requer role **editor** ou **admin**.
+    Cria documento. Requer role **editor** ou **admin** E scope **documents:write**.
 
     - `owner_id` é preenchido automaticamente com o `sub` do JWT (não enviado no body).
-    - **viewer** recebe `403 Forbidden`.
+    - **viewer** recebe `403 Forbidden` (role insuficiente).
+    - Cliente sem scope **documents:write** recebe `403 Forbidden` (scope insuficiente).
 
-    > 401 se sem token ou token inválido · 403 se role for viewer
+    > 401 se sem token ou token inválido · 403 se role for viewer ou faltar scope documents:write
     """
     global _next_id
     new_doc = {
@@ -206,17 +244,19 @@ async def get_me(current_user: dict = Depends(get_current_user)):
     """
     Retorna os claims relevantes do JWT do usuário autenticado.
 
-    Útil para verificar qual `sub`, quais `roles` e qual `email` estão no token.
+    Útil para verificar qual `sub`, quais `roles`, quais `scopes` e qual `email` estão no token.
 
     > 401 se sem token ou token inválido · nunca retorna 403 (qualquer autenticado acessa)
     """
     roles = current_user.get("realm_access", {}).get("roles", [])
+    scopes = extract_scopes(current_user)
     return {
         "sub": current_user.get("sub"),
         "username": current_user.get("preferred_username"),
         "email": current_user.get("email"),
         "name": current_user.get("name"),
         "roles": roles,
+        "scopes": scopes,
         "token_expires_at": current_user.get("exp"),
         "issued_by": current_user.get("iss"),
     }

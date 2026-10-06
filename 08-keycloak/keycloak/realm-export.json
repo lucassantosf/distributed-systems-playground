@@ -9,7 +9,7 @@
   "editUsernameAllowed": false,
   "bruteForceProtected": false,
 
-  "accessTokenLifespan": 300,
+  "accessTokenLifespan": 120,
   "ssoSessionIdleTimeout": 1800,
   "ssoSessionMaxLifespan": 36000,
   "offlineSessionIdleTimeout": 2592000,
@@ -38,6 +38,27 @@
     ]
   },
 
+  "clientScopes": [
+    {
+      "name": "documents:read",
+      "description": "Permissão de leitura de documentos",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      }
+    },
+    {
+      "name": "documents:write",
+      "description": "Permissão de escrita e criação de documentos",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      }
+    }
+  ],
+
   "clients": [
     {
       "clientId": "api-simples",
@@ -53,7 +74,8 @@
       "serviceAccountsEnabled": false,
       "protocol": "openid-connect",
       "redirectUris": ["http://localhost:8001/*"],
-      "webOrigins": ["http://localhost:8001"]
+      "webOrigins": ["http://localhost:8001"],
+      "optionalClientScopes": ["documents:read", "documents:write"]
     },
     {
       "clientId": "frontend-pkce",
@@ -69,6 +91,7 @@
       "protocol": "openid-connect",
       "redirectUris": ["http://localhost:5173/*"],
       "webOrigins": ["http://localhost:5173"],
+      "optionalClientScopes": ["documents:read", "documents:write"],
       "attributes": {
         "pkce.code.challenge.method": "S256"
       }

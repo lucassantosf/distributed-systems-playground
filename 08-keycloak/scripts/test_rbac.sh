@@ -41,9 +41,10 @@ FAIL=0
 get_token() {
     local username="$1"
     local password="$2"
+    local scope="${3:-openid profile email documents:read documents:write}"
     curl -s -X POST "$KEYCLOAK_URL" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "grant_type=password&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&username=${username}&password=${password}" \
+        -d "grant_type=password&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&username=${username}&password=${password}&scope=${scope}" \
         | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token', ''))"
 }
 
@@ -228,9 +229,13 @@ echo -e "${YELLOW}   editor e admin criam | viewer recebe 403${RESET}"
 
 DOC_PAYLOAD='{"title":"Documento de teste RBAC","content":"Criado pelo script de validação"}'
 
-check "alice (admin)  cria documento → 201" "201" "$(http_status POST "${API_URL}/documents" "$ALICE_TOKEN" "$DOC_PAYLOAD")"
-check "bob   (editor) cria documento → 201" "201" "$(http_status POST "${API_URL}/documents" "$BOB_TOKEN" "$DOC_PAYLOAD")"
-check "carol (viewer) cria documento → 403" "403" "$(http_status POST "${API_URL}/documents" "$CAROL_TOKEN" "$DOC_PAYLOAD")"
+check "alice (admin + scope write)  cria documento → 201" "201" "$(http_status POST "${API_URL}/documents" "$ALICE_TOKEN" "$DOC_PAYLOAD")"
+check "bob   (editor + scope write) cria documento → 201" "201" "$(http_status POST "${API_URL}/documents" "$BOB_TOKEN" "$DOC_PAYLOAD")"
+check "carol (viewer + scope write) cria documento → 403" "403" "$(http_status POST "${API_URL}/documents" "$CAROL_TOKEN" "$DOC_PAYLOAD")"
+
+# Card 25: Bob (editor) sem o scope documents:write (apenas documents:read)
+BOB_READ_ONLY_TOKEN=$(get_token "bob" "bob123" "openid documents:read")
+check "bob   (editor SEM scope write) cria documento → 403" "403" "$(http_status POST "${API_URL}/documents" "$BOB_READ_ONLY_TOKEN" "$DOC_PAYLOAD")"
 
 # Valida que o owner_id do doc criado por bob é o sub do bob
 BOB_NEW_DOC=$(curl -s -X POST "${API_URL}/documents" \

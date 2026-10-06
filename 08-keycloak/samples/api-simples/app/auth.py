@@ -157,7 +157,23 @@ def has_role(current_user: dict, *roles: str) -> bool:
     return any(r in user_roles for r in roles)
 
 
-# ── Dependency de autorização (Card 7) ───────────────────────────────────────
+def extract_scopes(current_user: dict) -> list[str]:
+    """Extrai os scopes do payload do JWT (campo 'scope' separado por espaços)."""
+    raw_scope = current_user.get("scope", "")
+    if isinstance(raw_scope, str):
+        return [s for s in raw_scope.split() if s]
+    if isinstance(raw_scope, list):
+        return raw_scope
+    return []
+
+
+def has_scope(current_user: dict, *scopes: str) -> bool:
+    """Verifica se o token possui todos os scopes informados."""
+    token_scopes = extract_scopes(current_user)
+    return all(s in token_scopes for s in scopes)
+
+
+# ── Dependency de autorização RBAC (Card 7) ──────────────────────────────────
 
 def require_roles(*roles: str):
     """
@@ -191,4 +207,102 @@ def require_roles(*roles: str):
         return current_user
 
     return dependency
+
+
+# ── Dependency de Scopes OAuth2 (Card 25) ────────────────────────────────────
+
+def require_scopes(*scopes: str):
+    """
+    Factory de dependency FastAPI que exige que o token possua todos os scopes informados.
+
+    Diferença semântica:
+      - Role (RBAC): o que o USUÁRIO tem permissão para fazer (ex: admin, editor, viewer).
+      - Scope (OAuth2): o que a APLICAÇÃO CLIENTE tem autorização para fazer em nome do usuário.
+
+    Uso nos endpoints:
+      current_user: dict = Depends(require_scopes("documents:write"))
+    """
+    async def dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        token_scopes = extract_scopes(current_user)
+        missing_scopes = [s for s in scopes if s not in token_scopes]
+        if missing_scopes:
+            username = current_user.get("preferred_username", "desconhecido")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Acesso negado para '{username}'. "
+                    f"Scopes necessários: {list(scopes)}. "
+                    f"Scopes ausentes: {missing_scopes}. "
+                    f"Scopes do token: {token_scopes}."
+                ),
+            )
+        return current_user
+
+    return dependency
+
+
+# ── Dependency de Token Introspection (Card 24) ──────────────────────────────
+
+async def get_current_user_introspect(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict:
+    """
+    FastAPI Dependency — valida o token chamando o endpoint de Introspection do Keycloak (RFC 7662).
+
+    Diferença versus get_current_user (JWKS local):
+      - JWKS local: validação rápida em memória (< 5ms), mas tokens revogados são aceitos até expirarem.
+      - Introspect: consulta o Keycloak a cada request (+ latência de rede), mas detecta revogação imediata.
+
+    Endpoint do Keycloak:
+      POST /realms/{realm}/protocol/openid-connect/token/introspect
+    """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de autenticação não fornecido. "
+                   "Inclua o header: Authorization: Bearer <token>",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+    introspect_url = (
+        f"{settings.keycloak_url}/realms/{settings.realm}"
+        "/protocol/openid-connect/token/introspect"
+    )
+
+    data = {
+        "token": token,
+        "client_id": settings.client_id,
+        "client_secret": settings.client_secret,
+    }
+
+    host_header = settings.keycloak_issuer_url.replace("http://", "").replace("https://", "")
+    headers = {"Host": host_header}
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            resp = await client.post(introspect_url, data=data, headers=headers)
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Não foi possível contatar o Keycloak para introspecção do token: {exc}",
+            )
+
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Keycloak retornou status {resp.status_code} na introspecção.",
+            )
+
+        introspect_data = resp.json()
+
+        if not introspect_data.get("active", False):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inativo ou revogado no Keycloak (via Token Introspection RFC 7662).",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        return introspect_data
+
 

@@ -414,7 +414,7 @@ Descrição: Implementar o botão "Sair" que: (1) chama o endpoint `/logout` do 
 
 ---
 
-# [*] Epic 4 — Sample C: BFF + M2M
+# [OK] Epic 4 — Sample C: BFF + M2M
 
 ## [OK] Card 18 — Estrutura base do BFF e do docs-service
 
@@ -428,27 +428,27 @@ Descrição: Implementar no BFF o mesmo middleware de validação JWT do Sample 
 
 Descrição: Implementar em `bff/app/clients/docs_client.py` a obtenção de um token de serviço usando Client Credentials: `POST /token` com `grant_type=client_credentials`, `client_id=bff-client` e `client_secret`. O BFF deve cachear esse token em memória e renová-lo apenas quando expirar (sem buscar um novo a cada requisição). Usar esse token de serviço para chamar o `docs-service`.
 
-## [*] Card 21 — docs-service valida token do BFF
+## [OK] Card 21 — docs-service valida token do BFF
 
 Descrição: Implementar no `docs-service` a validação do token de serviço recebido do BFF. O `docs-service` não sabe (nem precisa saber) quem é o usuário final — ele apenas valida que foi o `bff-client` autorizado que chamou. Validar que o `docs-service` retorna 401 se chamado diretamente sem token (mesmo de um usuário válido com token de usuário), demonstrando o isolamento.
 
-## [*] Card 22 — Demonstrar a diferença entre token de usuário e token de serviço
+## [OK] Card 22 — Demonstrar a diferença entre token de usuário e token de serviço
 
 Descrição: Criar um endpoint `GET /bff/debug/tokens` que retorna (apenas em modo dev) os claims dos dois tokens em uso: o token do usuário que chamou o BFF e o token de serviço que o BFF usa para chamar o `docs-service`. Destacar as diferenças: `sub` (usuário humano vs `bff-client`), `scope`, `azp` e ausência de roles de usuário no token de serviço.
 
 ---
 
-# [*] Epic 5 — Token Lifecycle e Conceitos Avançados
+# [OK] Epic 5 — Token Lifecycle e Conceitos Avançados
 
-## [*] Card 23 — Configurar TTLs de token no Keycloak
+## [OK] Card 23 — Configurar TTLs de token no Keycloak
 
 Descrição: Ajustar no Realm export os TTLs dos tokens: Access Token com vida curta (2 minutos, para facilitar testes de expiração), Refresh Token com vida longa (30 minutos). Validar o comportamento no Sample B: após 2 minutos, uma chamada à API deve retornar 401, disparar o refresh automático do Card 16, e a chamada ser repetida com sucesso. Observar os claims `exp` e `iat` no TokenViewer.
 
-## [*] Card 24 — Validação local vs Token Introspection
+## [OK] Card 24 — Validação local vs Token Introspection
 
 Descrição: Implementar no Sample A dois endpoints paralelos: `GET /documents` (usa validação local via JWKS, resposta em <5ms) e `GET /documents-introspect` (usa Token Introspection — chama `POST /token/introspect` no Keycloak a cada requisição). Criar um script de benchmark que mede a latência de 100 requisições em cada abordagem e exibe a diferença. Revogar um token no Admin UI e demonstrar que a validação local ainda o aceita enquanto o introspect o rejeita imediatamente.
 
-## [*] Card 25 — Scopes customizados
+## [OK] Card 25 — Scopes customizados
 
 Descrição: Criar um scope customizado `documents:read` e `documents:write` no Realm. Configurar o `frontend-pkce` para solicitar apenas `documents:read` no momento do login. Implementar no Sample A a verificação de scopes além de roles: `POST /documents` exige o scope `documents:write`. Demonstrar que um usuário com role `editor` mas sem o scope `documents:write` recebe 403 — mostrando que roles e scopes são controles complementares.
 

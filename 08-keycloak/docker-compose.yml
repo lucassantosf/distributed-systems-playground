@@ -128,6 +128,9 @@ services:
       - "8003:8003"
     environment:
       KEYCLOAK_URL: http://keycloak:8080
+      # Todos os tokens emitidos pelo Keycloak têm iss=http://localhost:8080,
+      # independentemente de como foram solicitados (via keycloak:8080 ou localhost:8080).
+      # O isolamento M2M é feito pelo claim azp (Authorized Party = bff-client).
       KEYCLOAK_ISSUER_URL: http://localhost:8080
       REALM: distributed-systems
       EXPECTED_CLIENT_ID: bff-client

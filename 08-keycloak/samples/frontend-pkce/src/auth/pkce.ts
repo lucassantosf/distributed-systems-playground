@@ -24,7 +24,7 @@ export const AUTH_CONFIG = {
   realm: 'distributed-systems',
   clientId: 'frontend-pkce',
   redirectUri: window.location.origin, // http://localhost:5173
-  scope: 'openid profile email',
+  scope: 'openid profile email documents:read',
 };
 
 /**
