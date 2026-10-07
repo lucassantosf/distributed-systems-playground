@@ -152,13 +152,14 @@ O domínio adotado é o de **documentos** — propositalmente simples para não 
 
 ### Endpoints protegidos da api-simples (Sample A)
 
-| Método | Endpoint | Roles permitidos | Comportamento |
-|--------|----------|-----------------|---------------|
-| `GET` | `/documents` | viewer, editor, admin | `admin` vê todos; outros veem apenas os próprios |
-| `POST` | `/documents` | editor, admin | Cria documento com owner = sub do token |
+| Método | Endpoint | Roles / Scopes | Comportamento |
+|--------|----------|----------------|---------------|
+| `GET` | `/documents` | viewer, editor, admin | Validação local JWKS. `admin` vê todos; outros veem apenas os próprios |
+| `GET` | `/documents-introspect` | viewer, editor, admin | Validação remota via Token Introspection RFC 7662 a cada requisição |
+| `POST` | `/documents` | editor, admin + scope `documents:write` | Cria documento com owner = sub do token |
 | `GET` | `/documents/{id}` | viewer, editor, admin | `admin` acessa qualquer; outros apenas os próprios |
 | `DELETE` | `/documents/{id}` | admin | Apenas admin pode excluir |
-| `GET` | `/me` | qualquer autenticado | Retorna claims do token (fins didáticos) |
+| `GET` | `/me` | qualquer autenticado | Retorna claims, roles e scopes do token atual |
 
 ---
 
@@ -177,8 +178,9 @@ O domínio adotado é o de **documentos** — propositalmente simples para não 
 │
 ├── scripts/                        # Scripts utilitários e suíte de testes
 │   ├── decode_tokens.py            # Card 4: inspeciona JWTs de alice, bob e carol
-│   ├── test_rbac.sh                # Card 8: suíte de testes automatizada de RBAC (25/25 ✓)
-│   └── validate_all_samples.sh     # Card 26: script de validação de todos os samples
+│   ├── test_rbac.sh                # Card 8/25: suíte automatizada de RBAC e Scopes (26/26 ✓)
+│   ├── benchmark_auth.py           # Card 24: benchmark JWKS local vs Introspection RFC 7662
+│   └── validate_all_samples.sh     # Card 26: script de validação end-to-end (52/52 ✓)
 │
 └── samples/
     │
@@ -188,12 +190,12 @@ O domínio adotado é o de **documentos** — propositalmente simples para não 
     │   └── app/
     │       ├── main.py             # FastAPI app + handler customizado de 422
     │       ├── config.py           # KEYCLOAK_URL, REALM, CLIENT_ID via env
-    │       ├── auth.py             # Middleware JWKS + extração de roles (Card 6/7)
+    │       ├── auth.py             # Middleware JWKS + roles e scopes (Card 6/7/24/25)
     │       ├── schemas/
     │       │   ├── document.py     # Pydantic schemas de criação e resposta
     │       │   └── error.py        # Schema ErrorResponse padronizado (Card 9)
     │       └── routers/
-    │           └── documents.py    # CRUD de documentos com RBAC (Card 7/9)
+    │           └── documents.py    # CRUD de documentos, introspect e RBAC/Scopes
     │
     ├── frontend-pkce/              # Sample B — React + Vite com PKCE manual (Épico 3)
     │   ├── Dockerfile
@@ -206,7 +208,7 @@ O domínio adotado é o de **documentos** — propositalmente simples para não 
     │       ├── App.tsx             # Layout principal e gerenciador de estado
     │       ├── index.css
     │       ├── auth/
-    │       │   ├── pkce.ts         # Card 11: code_verifier e SHA-256 code_challenge
+    │       │   ├── pkce.ts         # Card 11/25: code_verifier, challenge e scopes
     │       │   ├── callback.ts     # Card 12: captura de code e validação anti-CSRF state
     │       │   ├── tokens.ts       # Card 13/16/17: troca de code, refresh e logout
     │       │   └── api.ts          # Card 16: interceptor fetchWithAuth com auto-refresh
@@ -226,16 +228,22 @@ O domínio adotado é o de **documentos** — propositalmente simples para não 
         │   └── app/
         │       ├── main.py
         │       ├── config.py
-        │       ├── auth.py         # Valida token do usuário
-        │       └── clients/
-        │           └── docs_client.py  # Chama docs-service com Client Credentials
+        │       ├── auth.py         # Valida token do usuário (JWKS)
+        │       ├── clients/
+        │       │   └── docs_client.py  # Chama docs-service com Client Credentials
+        │       ├── schemas/        # Schemas Pydantic de resposta e erros
+        │       └── routers/
+        │           └── bff.py      # Endpoints /bff/documents e /bff/debug/tokens
         └── docs-service/
             ├── Dockerfile
             ├── requirements.txt
             └── app/
                 ├── main.py
                 ├── config.py
-                └── auth.py         # Valida token do BFF (não do usuário)
+                ├── auth.py         # Valida token de serviço M2M (claim azp)
+                ├── schemas/        # Schema ErrorResponse
+                └── routers/
+                    └── internal.py # Endpoints /internal/documents (apenas M2M)
 ```
 
 ---
@@ -265,7 +273,7 @@ O Realm `distributed-systems` é **importado automaticamente** no startup do Key
 | `api-simples` | Confidential | Sample A | Valida tokens (resource server) |
 | `frontend-pkce` | Public | Sample B | Authorization Code + PKCE |
 | `bff-client` | Confidential | Sample C (BFF) | Client Credentials |
-| `docs-service` | Confidential | Sample C (downstream) | Valida tokens de serviço |
+| `docs-service` | Confidential (Bearer-only) | Sample C (downstream) | Valida tokens de serviço |
 
 ---
 
@@ -285,17 +293,22 @@ docker compose up --build -d
 open http://localhost:8080/admin
 # Login: admin / admin
 
-# 5. Acessar os samples
+# 5. Acessar o frontend
 open http://localhost:5173    # Frontend PKCE (Sample B)
 
-# 6. Rodar suíte de testes de RBAC da api-simples (Sample A)
+# 6. Rodar suíte de testes de RBAC e Scopes (Sample A)
 bash scripts/test_rbac.sh
 
-# 7. Testar a api-simples com curl manualmente
-# Obter token para alice (admin):
+# 7. Rodar benchmark de validação local vs Token Introspection (Card 24)
+python3 scripts/benchmark_auth.py
+
+# 8. Rodar validação end-to-end de todos os samples (Card 26)
+bash scripts/validate_all_samples.sh
+
+# 9. Testar a api-simples com curl manualmente
 TOKEN=$(curl -s -X POST \
   "http://localhost:8080/realms/distributed-systems/protocol/openid-connect/token" \
-  -d "grant_type=password&client_id=api-simples&client_secret=GZYImUZPV2W7tWzsQKTbpzdNFI2eLdGC&username=alice&password=alice123" \
+  -d "grant_type=password&client_id=api-simples&client_secret=GZYImUZPV2W7tWzsQKTbpzdNFI2eLdGC&username=alice&password=alice123&scope=openid profile email documents:read documents:write" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
 
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8001/documents
@@ -454,12 +467,58 @@ Descrição: Criar um scope customizado `documents:read` e `documents:write` no 
 
 ---
 
-# [*] Epic 6 — Consolidação
+# [OK] Epic 6 — Consolidação
 
-## [*] Card 26 — Script de validação end-to-end
+## [OK] Card 26 — Script de validação end-to-end
 
 Descrição: Criar `scripts/validate_all_samples.sh` que valida os três samples automaticamente: obtém tokens para alice, bob e carol; testa os endpoints do Sample A com cada usuário validando os status HTTP esperados; verifica que o Sample C rejeita chamadas diretas ao `docs-service`; exibe um resumo de PASS/FAIL. O script deve funcionar com `bash scripts/validate_all_samples.sh` após `docker compose up --build -d`.
 
-## [*] Card 27 — Consolidar aprendizados no README
+## [OK] Card 27 — Consolidar aprendizados no README
 
 Descrição: Adicionar ao README a seção **Lições Aprendidas** cobrindo: o que o Keycloak resolve que uma implementação própria de auth não resolveria tão bem; a diferença real entre OAuth2 (autorização) e OpenID Connect (autenticação); quando usar Authorization Code + PKCE vs Client Credentials; por que validação local é rápida mas tem o problema de revogação; e quando faz sentido (ou não) usar um IAM externo.
+
+---
+
+## 💡 Lições Aprendidas
+
+### 1. Keycloak vs Auth Caseira
+- **Base Central de Identidade**: Gerencia usuários, credenciais e roles para múltiplos frontends e APIs em um único lugar.
+- **Padrões de Mercado**: Suporte nativo e testado a OAuth 2.0, OpenID Connect, PKCE (RFC 7636), JWKS (RFC 7517) e Token Introspection (RFC 7662).
+- **Chaves Assimétricas (RS256/JWKS)**: APIs validam tokens usando apenas chaves públicas cacheadas, sem compartilhar segredos simétricos (`client_secret`).
+- **Recursos Prontos**: SSO, MFA, rotação de chaves, detecção de força bruta e auditoria sem necessidade de código customizado.
+
+### 2. OAuth 2.0 vs OpenID Connect (OIDC)
+- **OAuth 2.0 = Autorização**: Emite o **Access Token** para a API (*"o que o cliente tem permissão para fazer"*).
+- **OpenID Connect = Autenticação**: Emite o **ID Token** para a aplicação cliente (*"quem é o usuário logado"*).
+- **Regra Prática**: O frontend usa o **ID Token** para exibir nome/perfil na interface, mas envia **apenas o Access Token** no header `Authorization: Bearer` para autenticar nas APIs.
+
+### 3. PKCE vs Client Credentials
+- **Authorization Code + PKCE (RFC 7636)**: Para aplicações com **interação de usuário humano** no browser ou mobile (React, Vue, iOS, Android). Elimina segredos estáticos no frontend gerando um par criptográfico efêmero (`code_verifier` e `code_challenge` SHA-256).
+- **Client Credentials**: Para comunicação **Machine-to-Machine (M2M)** entre serviços de backend (ex: BFF → downstream). Autenticação direta com `client_id` + `client_secret`, sem usuário humano.
+
+### 4. Validação Local (JWKS) vs Token Introspection (RFC 7662)
+- **Validação Local (JWKS)**: Performance extrema (< 3ms) e alta resiliência (a API segue operando mesmo se o Keycloak oscilar). Ponto de atenção: não detecta revogação instantânea antes do `exp`.
+- **Token Introspection (RFC 7662)**: Consulta o Keycloak a cada request; detecta revogação imediata, mas adiciona latência de rede (+15–30ms) e acoplamento síncrono.
+- **Padrão Recomendado**: **Access Token de vida curta (2 a 5 min)** validado localmente via JWKS + **Refresh Token longo (30 min)** que revalida a sessão no Keycloak periodicamente.
+
+### 5. Roles (RBAC) vs Scopes (OAuth 2.0)
+- **Role**: O que o **usuário** tem permissão para fazer (ex: `admin`, `editor`, `viewer`).
+- **Scope**: O que a **aplicação cliente** tem autorização para executar em nome do usuário (ex: `documents:read`, `documents:write`).
+- **São complementares**: Para criar um documento, a API exige que o usuário seja `admin`/`editor` **E** que o client possua o escopo `documents:write`.
+
+### 6. Quando adotar um IAM Externo
+- **Adotar**: Ecossistemas com múltiplos microsserviços, múltiplos frontends (Web, Mobile, BFF), necessidade de SSO, M2M, federação corporativa (Google, SAML, LDAP) ou requisitos de auditoria.
+- **Evitar (Overengineering)**: Monólitos pequenos com 1 banco único ou MVPs iniciais (onde auth básica com JWT embutido é suficiente).
+
+---
+
+### 🏁 Resumo dos 6 Épicos Concluídos
+
+| Épico | Foco | Status |
+|---|---|:---:|
+| **Épico 1** | Infraestrutura Keycloak + Postgres, Realm `distributed-systems`, Users, Roles e Clients | `[OK]` |
+| **Épico 2** | Sample A (`api-simples` FastAPI): Validação JWKS RS256 local, RBAC e tratamento de erros | `[OK]` |
+| **Épico 3** | Sample B (`frontend-pkce` React): PKCE manual, TokenViewer, auto-refresh e logout | `[OK]` |
+| **Épico 4** | Sample C (`bff-m2m`): BFF Pattern, Client Credentials M2M e isolamento downstream | `[OK]` |
+| **Épico 5** | Token Lifecycle: TTLs (2m/30m), Validação Local vs Introspection RFC 7662 e Scopes | `[OK]` |
+| **Épico 6** | Consolidação: Suite de testes end-to-end (52/52) e Lições Aprendidas no README | `[OK]` |
