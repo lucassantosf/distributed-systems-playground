@@ -1,0 +1,133 @@
+version: "3.8"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: saga-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saga-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: saga-postgres
+    ports:
+      - "5490:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: saga_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d saga_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saga-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: saga-redis
+    ports:
+      - "6490:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saga-net
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+    container_name: saga-orchestrator
+    ports:
+      - "8090:8090"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/saga_db
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      REDIS_URL: redis://redis:6379/0
+      STEP_TIMEOUT_SECONDS: 5
+      STEP_MAX_ATTEMPTS: 3
+      RETRY_BASE_DELAY_SECONDS: 0.5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - saga-net
+
+  inventory:
+    build:
+      context: ./services/inventory
+    container_name: saga-inventory
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saga-net
+
+  payment:
+    build:
+      context: ./services/payment
+    container_name: saga-payment
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saga-net
+
+  shipping:
+    build:
+      context: ./services/shipping
+    container_name: saga-shipping
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saga-net
+
+  notification:
+    build:
+      context: ./services/notification
+    container_name: saga-notification
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - saga-net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  saga-net:
+    driver: bridge
+
