@@ -17,6 +17,9 @@ health:
 	@curl -s http://localhost:8090/health || echo "Orchestrator not responding"
 	@echo ""
 
+verify-workers:
+	docker compose exec inventory python /app/../../scripts/test_workers.py || python3 scripts/test_workers.py
+
 ps:
 	docker compose ps
 

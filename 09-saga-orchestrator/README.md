@@ -239,7 +239,7 @@ make stress      # stress test de throughput
 
 Criar o `docker-compose.yml` com todos os serviços: `orchestrator`, `inventory`, `payment`, `shipping`, `notification`, `rabbitmq`, `postgres` e `redis`. Usar `depends_on` com `condition: service_healthy` para que os workers só subam após a infraestrutura estar pronta.
 
-**[ ] Card 1.2 — Workers dos Serviços Mockados**
+**[OK] Card 1.2 — Workers dos Serviços Mockados**
 
 Implementar os quatro workers Python que consomem sua fila de comandos (ex: `inventory.commands`), aplicam as regras de falha determinísticas e publicam a reply em `saga.replies`. Cada worker trata tanto comandos de execução quanto de compensação na mesma fila, distinguidos pelo campo `command_type`.
 
