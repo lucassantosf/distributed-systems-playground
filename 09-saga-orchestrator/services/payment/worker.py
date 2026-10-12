@@ -2,32 +2,12 @@ import asyncio
 import json
 import logging
 import os
-from typing import Tuple
 import aio_pika
+
+from rules import apply_business_rules
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("payment-worker")
-
-
-def apply_business_rules(command_type: str, payload: dict, attempt: int = 1) -> Tuple[bool, dict, str | None]:
-    total_amount = float(payload.get("total_amount", 0.0))
-    order_id = str(payload.get("order_id", ""))
-
-    if command_type == "ProcessarPagamento":
-        # Falha transitória simulada: order_id terminando em 77 falha nas 2 primeiras tentativas
-        if order_id.endswith("77") and attempt < 3:
-            return False, {}, f"Erro transitório no gateway de pagamento (tentativa {attempt}/3)"
-
-        # Pagamento recusado quando total_amount > 9999.99
-        if total_amount > 9999.99:
-            return False, {}, "Pagamento recusado: valor excede limite de crédito"
-
-        return True, {"transaction_id": f"tx_{order_id}_{attempt}", "status": "approved"}, None
-
-    elif command_type == "EstornarPagamento":
-        return True, {"refund_id": f"ref_{order_id}", "status": "refunded"}, None
-
-    return True, {}, None
 
 
 async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.Channel):

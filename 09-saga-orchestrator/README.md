@@ -243,11 +243,11 @@ Criar o `docker-compose.yml` com todos os serviços: `orchestrator`, `inventory`
 
 Implementar os quatro workers Python que consomem sua fila de comandos (ex: `inventory.commands`), aplicam as regras de falha determinísticas e publicam a reply em `saga.replies`. Cada worker trata tanto comandos de execução quanto de compensação na mesma fila, distinguidos pelo campo `command_type`.
 
-**[ ] Card 1.3 — Regras de Falha Determinísticas**
+**[OK] Card 1.3 — Regras de Falha Determinísticas**
 
 Isolar a lógica de mock em uma função pura `apply_business_rules(command_type, payload, attempt) -> (success, result, error)` em cada worker. O campo `attempt` no payload permite que o cenário `"77"` (falha transitória) saiba em qual tentativa está e retorne sucesso apenas na 3ª.
 
-**[ ] Card 1.4 — Topologia RabbitMQ**
+**[OK] Card 1.4 — Topologia RabbitMQ**
 
 Declarar exchanges, filas e bindings no startup: exchange `saga.commands` (direct) roteando para filas por serviço, fila `saga.replies` para o orquestrador consumir, e DLX `saga.dlx` → DLQ `saga.dlq` configurados via `x-dead-letter-exchange` em cada fila de comando. A declaração deve ser idempotente para suportar restarts.
 

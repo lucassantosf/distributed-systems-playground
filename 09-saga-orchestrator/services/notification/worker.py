@@ -2,17 +2,12 @@ import asyncio
 import json
 import logging
 import os
-from typing import Tuple
 import aio_pika
+
+from rules import apply_business_rules
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("notification-worker")
-
-
-def apply_business_rules(command_type: str, payload: dict, attempt: int = 1) -> Tuple[bool, dict, str | None]:
-    # Notification é fire-and-forget: sempre sucesso
-    customer_id = payload.get("customer_id")
-    return True, {"notified": True, "customer_id": customer_id}, None
 
 
 async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.Channel):

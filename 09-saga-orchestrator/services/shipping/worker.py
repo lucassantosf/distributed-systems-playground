@@ -2,23 +2,12 @@ import asyncio
 import json
 import logging
 import os
-from typing import Tuple
 import aio_pika
+
+from rules import apply_business_rules
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("shipping-worker")
-
-
-def apply_business_rules(command_type: str, payload: dict, attempt: int = 1) -> Tuple[bool, dict, str | None]:
-    order_id = str(payload.get("order_id", ""))
-
-    if command_type == "DespacharPedido":
-        return True, {"tracking_code": f"TRK-{order_id[:8].upper()}"}, None
-
-    elif command_type == "CancelarDespacho":
-        return True, {"status": "shipping_cancelled"}, None
-
-    return True, {}, None
 
 
 async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.Channel):
@@ -33,7 +22,7 @@ async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.C
 
             logger.info(f"Recebido '{command_type}' (id={command_id}, saga={saga_id}, attempt={attempt})")
 
-            # Simulação de timeout se order_id terminar em "88"
+            # Simulação de timeout no worker se order_id terminar em "88"
             if command_type == "DespacharPedido" and str(payload.get("order_id", "")).endswith("88"):
                 logger.warning(f"Simulando timeout no despacho (dormindo 60s) para pedido {payload.get('order_id')}")
                 await asyncio.sleep(60)

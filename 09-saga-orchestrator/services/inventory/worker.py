@@ -2,29 +2,12 @@ import asyncio
 import json
 import logging
 import os
-from typing import Tuple
 import aio_pika
+
+from rules import apply_business_rules
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("inventory-worker")
-
-
-def apply_business_rules(command_type: str, payload: dict, attempt: int = 1) -> Tuple[bool, dict, str | None]:
-    items = payload.get("items", [])
-    order_id = str(payload.get("order_id", ""))
-
-    if command_type == "ReservarEstoque":
-        for item in items:
-            if "ESGOTADO" in str(item.get("sku", "")):
-                return False, {}, "Estoque indisponível: produto esgotado"
-        return True, {"reserved_items": len(items)}, None
-
-    elif command_type == "LiberarEstoque":
-        if order_id.endswith("66"):
-            return False, {}, "Falha fatal na compensação do estoque"
-        return True, {"status": "stock_released"}, None
-
-    return True, {}, None
 
 
 async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.Channel):

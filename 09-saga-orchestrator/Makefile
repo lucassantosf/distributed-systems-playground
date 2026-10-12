@@ -20,6 +20,12 @@ health:
 verify-workers:
 	docker compose exec inventory python /app/../../scripts/test_workers.py || python3 scripts/test_workers.py
 
+verify-topology:
+	docker compose exec -e RABBITMQ_URL="amqp://guest:guest@rabbitmq:5672/" orchestrator python /scripts/verify_topology.py || python3 scripts/verify_topology.py
+
+test:
+	python3 -m unittest discover -s tests -p "test_*.py"
+
 ps:
 	docker compose ps
 
