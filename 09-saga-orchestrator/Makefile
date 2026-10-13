@@ -23,6 +23,9 @@ verify-workers:
 verify-topology:
 	docker compose exec -e RABBITMQ_URL="amqp://guest:guest@rabbitmq:5672/" orchestrator python /scripts/verify_topology.py || python3 scripts/verify_topology.py
 
+verify-api:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_api.py)" || python3 scripts/verify_api.py
+
 test:
 	python3 -m unittest discover -s tests -p "test_*.py"
 

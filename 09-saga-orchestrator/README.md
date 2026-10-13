@@ -251,7 +251,7 @@ Isolar a lógica de mock em uma função pura `apply_business_rules(command_type
 
 Declarar exchanges, filas e bindings no startup: exchange `saga.commands` (direct) roteando para filas por serviço, fila `saga.replies` para o orquestrador consumir, e DLX `saga.dlx` → DLQ `saga.dlq` configurados via `x-dead-letter-exchange` em cada fila de comando. A declaração deve ser idempotente para suportar restarts.
 
-**[ ] Card 1.5 — API HTTP do Orquestrador**
+**[OK] Card 1.5 — API HTTP do Orquestrador**
 
 Implementar os endpoints `POST /sagas`, `GET /sagas`, `GET /sagas/{id}` e `GET /sagas/{id}/timeline`. O `POST /sagas` valida o payload, persiste a Saga no Postgres e dispara o primeiro step de forma assíncrona, retornando `202 Accepted` com o `saga_id`.
 

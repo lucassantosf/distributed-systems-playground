@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.messaging.topology import setup_rabbitmq_topology
+from app.api.routers import sagas
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("orchestrator")
@@ -35,12 +36,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Saga Orchestrator",
+    description="Workflow Engine / Saga Orchestrator API",
     version="0.1.0",
     lifespan=lifespan,
 )
 
+# Registra as rotas de Sagas
+app.include_router(sagas.router)
 
-@app.get("/health")
+
+@app.get("/health", tags=["Health"])
 async def health_check():
     return {
         "status": "ok",
