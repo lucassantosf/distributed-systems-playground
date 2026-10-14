@@ -259,11 +259,11 @@ Implementar os endpoints `POST /sagas`, `GET /sagas`, `GET /sagas/{id}` e `GET /
 
 ### Epic 2 — Modelagem da State Machine e Persistência
 
-**[ ] Card 2.1 — Schema do Banco de Dados**
+**[OK] Card 2.1 — Schema do Banco de Dados**
 
 Criar três modelos SQLAlchemy: `Saga` (instância do workflow com status e payload), `SagaStep` (cada etapa com `command_id` único para idempotência, `attempts` e timestamps) e `SagaEvent` (audit trail append-only — nunca atualizado, apenas inserido). Gerar migrations com Alembic.
 
-**[ ] Card 2.2 — Definição Declarativa do Workflow**
+**[OK] Card 2.2 — Definição Declarativa do Workflow**
 
 Implementar `workflow.py` com uma lista de `StepDefinition` descrevendo serviço, `command_type`, `compensation_command`, `timeout_seconds` e `max_attempts` de cada step. Essa separação torna o engine genérico — ele não conhece os steps específicos, apenas executa a sequência definida.
 

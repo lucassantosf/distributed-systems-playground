@@ -29,6 +29,9 @@ verify-api:
 test:
 	python3 -m unittest discover -s tests -p "test_*.py"
 
+migrate:
+	docker compose exec orchestrator alembic upgrade head
+
 ps:
 	docker compose ps
 
