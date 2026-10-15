@@ -267,11 +267,11 @@ Criar três modelos SQLAlchemy: `Saga` (instância do workflow com status e payl
 
 Implementar `workflow.py` com uma lista de `StepDefinition` descrevendo serviço, `command_type`, `compensation_command`, `timeout_seconds` e `max_attempts` de cada step. Essa separação torna o engine genérico — ele não conhece os steps específicos, apenas executa a sequência definida.
 
-**[ ] Card 2.3 — State Machine: Transições de Estado**
+**[OK] Card 2.3 — State Machine: Transições de Estado**
 
 Implementar `state_machine.py` com as transições válidas para `Saga` e `SagaStep`, lançando `InvalidTransitionError` em transições ilegais. A state machine deve ser testável isoladamente, sem dependência de banco ou RabbitMQ.
 
-**[ ] Card 2.4 — SagaEngine: Motor de Execução**
+**[OK] Card 2.4 — SagaEngine: Motor de Execução**
 
 Implementar `engine.py` com os métodos `start_saga`, `handle_reply`, `start_compensation` e `handle_timeout`. O Engine é o único componente que conhece o estado atual da Saga e decide o próximo passo — toda ação registra um `SagaEvent` no banco para rastreabilidade completa.
 

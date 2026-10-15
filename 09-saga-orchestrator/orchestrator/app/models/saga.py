@@ -1,126 +1,157 @@
-import enum
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import (
-    Column,
-    String,
-    Integer,
-    DateTime,
-    Enum,
-    ForeignKey,
-    Text,
-    Index,
-)
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import declarative_base, relationship
 
-Base = declarative_base()
+# Enums em módulo puro (sem dependência de SQLAlchemy) — re-exportados aqui
+# para manter compatibilidade com imports já existentes em todo o codebase.
+from app.core.enums import SagaStatus, StepStatus  # noqa: F401
 
-
-class SagaStatus(str, enum.Enum):
-    STARTED = "STARTED"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    COMPENSATING = "COMPENSATING"
-    COMPENSATED = "COMPENSATED"
-    FAILED = "FAILED"
-
-
-class StepStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    COMPENSATING = "COMPENSATING"
-    COMPENSATED = "COMPENSATED"
-    COMPENSATING_FAILED = "COMPENSATING_FAILED"
-
-
-class Saga(Base):
-    """
-    Representa a instância de execução do workflow distribuído (Saga).
-    """
-    __tablename__ = "sagas"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    order_id = Column(String(100), unique=True, nullable=False, index=True)
-    status = Column(
-        Enum(SagaStatus, name="saga_status_enum", native_enum=True),
-        nullable=False,
-        default=SagaStatus.STARTED,
-        index=True,
+try:
+    from sqlalchemy import (
+        Column,
+        String,
+        Integer,
+        DateTime,
+        Enum,
+        ForeignKey,
+        Text,
+        Index,
     )
-    current_step_index = Column(Integer, default=0, nullable=False)
-    payload = Column(JSONB, nullable=False, default=dict)
+    from sqlalchemy.dialects.postgresql import UUID, JSONB
+    from sqlalchemy.orm import declarative_base, relationship
 
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False,
-    )
-    completed_at = Column(DateTime(timezone=True), nullable=True)
+    HAS_SQLALCHEMY = True
+    Base = declarative_base()
 
-    # Relacionamentos
-    steps = relationship("SagaStep", back_populates="saga", cascade="all, delete-orphan", order_by="SagaStep.step_index")
-    events = relationship("SagaEvent", back_populates="saga", cascade="all, delete-orphan", order_by="SagaEvent.created_at")
+    class Saga(Base):
+        """
+        Representa a instância de execução do workflow distribuído (Saga).
+        """
+        __tablename__ = "sagas"
 
+        id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+        order_id = Column(String(100), unique=True, nullable=False, index=True)
+        status = Column(
+            Enum(SagaStatus, name="saga_status_enum", native_enum=True),
+            nullable=False,
+            default=SagaStatus.STARTED,
+            index=True,
+        )
+        current_step_index = Column(Integer, default=0, nullable=False)
+        payload = Column(JSONB, nullable=False, default=dict)
 
-class SagaStep(Base):
-    """
-    Representa cada etapa individual de uma Saga.
-    O command_id funciona como idempotency key de cada tentativa.
-    """
-    __tablename__ = "saga_steps"
+        created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+        updated_at = Column(
+            DateTime(timezone=True),
+            default=lambda: datetime.now(timezone.utc),
+            onupdate=lambda: datetime.now(timezone.utc),
+            nullable=False,
+        )
+        completed_at = Column(DateTime(timezone=True), nullable=True)
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    saga_id = Column(UUID(as_uuid=True), ForeignKey("sagas.id", ondelete="CASCADE"), nullable=False, index=True)
-    step_name = Column(String(100), nullable=False)
-    step_index = Column(Integer, nullable=False)
+        # Relacionamentos
+        steps = relationship("SagaStep", back_populates="saga", cascade="all, delete-orphan", order_by="SagaStep.step_index")
+        events = relationship("SagaEvent", back_populates="saga", cascade="all, delete-orphan", order_by="SagaEvent.created_at")
 
-    status = Column(
-        Enum(StepStatus, name="step_status_enum", native_enum=True),
-        nullable=False,
-        default=StepStatus.PENDING,
-        index=True,
-    )
+    class SagaStep(Base):
+        """
+        Representa cada etapa individual de uma Saga.
+        O command_id funciona como idempotency key de cada tentativa.
+        """
+        __tablename__ = "saga_steps"
 
-    # Idempotency key para a tentativa atual
-    command_id = Column(String(100), unique=True, nullable=True, index=True)
-    attempts = Column(Integer, default=0, nullable=False)
+        id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+        saga_id = Column(UUID(as_uuid=True), ForeignKey("sagas.id", ondelete="CASCADE"), nullable=False, index=True)
+        step_name = Column(String(100), nullable=False)
+        step_index = Column(Integer, nullable=False)
 
-    payload = Column(JSONB, nullable=True, default=dict)
-    result = Column(JSONB, nullable=True, default=dict)
-    error_message = Column(Text, nullable=True)
+        status = Column(
+            Enum(StepStatus, name="step_status_enum", native_enum=True),
+            nullable=False,
+            default=StepStatus.PENDING,
+            index=True,
+        )
 
-    started_at = Column(DateTime(timezone=True), nullable=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-    failed_at = Column(DateTime(timezone=True), nullable=True)
+        # Idempotency key para a tentativa atual
+        command_id = Column(String(100), unique=True, nullable=True, index=True)
+        attempts = Column(Integer, default=0, nullable=False)
 
-    saga = relationship("Saga", back_populates="steps")
-    events = relationship("SagaEvent", back_populates="step")
+        payload = Column(JSONB, nullable=True, default=dict)
+        result = Column(JSONB, nullable=True, default=dict)
+        error_message = Column(Text, nullable=True)
 
-    __table_args__ = (
-        Index("ix_saga_steps_saga_step_index", "saga_id", "step_index", unique=True),
-    )
+        started_at = Column(DateTime(timezone=True), nullable=True)
+        completed_at = Column(DateTime(timezone=True), nullable=True)
+        failed_at = Column(DateTime(timezone=True), nullable=True)
 
+        saga = relationship("Saga", back_populates="steps")
+        events = relationship("SagaEvent", back_populates="step")
 
-class SagaEvent(Base):
-    """
-    Audit trail imutável (append-only) do ciclo de vida da Saga.
-    Eventos nunca são atualizados ou apagados.
-    """
-    __tablename__ = "saga_events"
+        __table_args__ = (
+            Index("ix_saga_steps_saga_step_index", "saga_id", "step_index", unique=True),
+        )
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    saga_id = Column(UUID(as_uuid=True), ForeignKey("sagas.id", ondelete="CASCADE"), nullable=False, index=True)
-    step_id = Column(UUID(as_uuid=True), ForeignKey("saga_steps.id", ondelete="SET NULL"), nullable=True, index=True)
+    class SagaEvent(Base):
+        """
+        Audit trail imutável (append-only) do ciclo de vida da Saga.
+        Eventos nunca são atualizados ou apagados.
+        """
+        __tablename__ = "saga_events"
 
-    event_type = Column(String(100), nullable=False, index=True)
-    event_payload = Column(JSONB, nullable=False, default=dict)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+        id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+        saga_id = Column(UUID(as_uuid=True), ForeignKey("sagas.id", ondelete="CASCADE"), nullable=False, index=True)
+        step_id = Column(UUID(as_uuid=True), ForeignKey("saga_steps.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    saga = relationship("Saga", back_populates="events")
-    step = relationship("SagaStep", back_populates="events")
+        event_type = Column(String(100), nullable=False, index=True)
+        event_payload = Column(JSONB, nullable=False, default=dict)
+        created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+        saga = relationship("Saga", back_populates="events")
+        step = relationship("SagaStep", back_populates="events")
+
+except ImportError:
+    HAS_SQLALCHEMY = False
+    Base = object
+
+    class Saga:
+        def __init__(self, id=None, order_id=None, status=SagaStatus.STARTED, current_step_index=0, payload=None, created_at=None, updated_at=None, completed_at=None):
+            self.id = id or uuid.uuid4()
+            self.order_id = order_id
+            self.status = status
+            self.current_step_index = current_step_index
+            self.payload = payload if payload is not None else {}
+            self.created_at = created_at or datetime.now(timezone.utc)
+            self.updated_at = updated_at or datetime.now(timezone.utc)
+            self.completed_at = completed_at
+            self.steps = []
+            self.events = []
+
+    class SagaStep:
+        def __init__(self, id=None, saga_id=None, step_name=None, step_index=0, status=StepStatus.PENDING, command_id=None, attempts=0, payload=None, result=None, error_message=None, started_at=None, completed_at=None, failed_at=None):
+            self.id = id or uuid.uuid4()
+            self.saga_id = saga_id
+            self.step_name = step_name
+            self.step_index = step_index
+            self.status = status
+            self.command_id = command_id
+            self.attempts = attempts
+            self.payload = payload if payload is not None else {}
+            self.result = result if result is not None else {}
+            self.error_message = error_message
+            self.started_at = started_at
+            self.completed_at = completed_at
+            self.failed_at = failed_at
+            self.saga = None
+            self.events = []
+
+    class SagaEvent:
+        def __init__(self, id=None, saga_id=None, step_id=None, event_type="", event_payload=None, created_at=None):
+            self.id = id or uuid.uuid4()
+            self.saga_id = saga_id
+            self.step_id = step_id
+            self.event_type = event_type
+            self.event_payload = event_payload if event_payload is not None else {}
+            self.created_at = created_at or datetime.now(timezone.utc)
+            self.saga = None
+            self.step = None
+
 
