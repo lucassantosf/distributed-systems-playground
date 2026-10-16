@@ -279,7 +279,7 @@ Implementar `engine.py` com os métodos `start_saga`, `handle_reply`, `start_com
 
 ### Epic 3 — Happy Path End-to-End
 
-**[ ] Card 3.1 — Publicação de Comandos**
+**[OK] Card 3.1 — Publicação de Comandos**
 
 Implementar `publisher.py` que serializa o comando (`command_id`, `command_type`, `saga_id`, `attempt`, `payload`) e publica no exchange `saga.commands` com routing key igual ao nome do serviço. O `command_id` é gerado pelo Engine e persistido no `SagaStep` antes da publicação.
 
