@@ -68,7 +68,12 @@ async def main():
         channel = await connection.channel()
         await channel.set_qos(prefetch_count=10)
 
-        queue = await channel.declare_queue("shipping.commands", durable=True)
+        dlx_exchange = os.getenv("EXCHANGE_DLX", "saga.dlx")
+        queue = await channel.declare_queue(
+            "shipping.commands",
+            durable=True,
+            arguments={"x-dead-letter-exchange": dlx_exchange},
+        )
         await channel.declare_queue("saga.replies", durable=True)
 
         logger.info("Worker pronto. Escutando na fila 'shipping.commands'...")

@@ -283,7 +283,7 @@ Implementar `engine.py` com os métodos `start_saga`, `handle_reply`, `start_com
 
 Implementar `publisher.py` que serializa o comando (`command_id`, `command_type`, `saga_id`, `attempt`, `payload`) e publica no exchange `saga.commands` com routing key igual ao nome do serviço. O `command_id` é gerado pelo Engine e persistido no `SagaStep` antes da publicação.
 
-**[ ] Card 3.2 — Consumer de Replies como AsyncIO Task**
+**[OK] Card 3.2 — Consumer de Replies como AsyncIO Task**
 
 Implementar `consumer.py` como asyncio task iniciada no `lifespan` do FastAPI, consumindo `saga.replies` em loop contínuo. Faz `ack` apenas após `engine.handle_reply` concluir com sucesso — em caso de exceção, faz `nack` com `requeue=False` para a mensagem ir para a DLQ.
 
