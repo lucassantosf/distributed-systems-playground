@@ -114,7 +114,8 @@ class TestRepliesConsumer(unittest.IsolatedAsyncioTestCase):
         }
         msg = MockIncomingMessage(body=json.dumps(payload).encode("utf-8"))
 
-        await consumer.process_message(msg)
+        with self.assertLogs("saga-consumer", level="ERROR"):
+            await consumer.process_message(msg)
 
         # Mensagem NÃO foi acked
         self.assertFalse(msg.acked)
@@ -129,7 +130,8 @@ class TestRepliesConsumer(unittest.IsolatedAsyncioTestCase):
         # Payload corrompido / JSON quebrado
         msg = MockIncomingMessage(body=b"{invalid-json: none,")
 
-        await consumer.process_message(msg)
+        with self.assertLogs("saga-consumer", level="ERROR"):
+            await consumer.process_message(msg)
 
         # Engine nem foi chamado
         self.assertEqual(len(engine.handled_replies), 0)

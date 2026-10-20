@@ -33,7 +33,9 @@ async def main():
         assert res.status_code == 202, f"Erro ao criar saga: {res.status_code} {res.text}"
         created_data = res.json()
         saga_id = created_data["saga_id"]
-        assert created_data["status"] == "STARTED"
+        # Após Card 3.3 o engine inicia a saga com RUNNING imediatamente
+        assert created_data["status"] in ("STARTED", "RUNNING"), \
+            f"Status inesperado: {created_data['status']}"
         assert created_data["order_id"] == order_id
         print(f"✅ 2. POST /sagas -> 202 Accepted (saga_id: {saga_id})")
 

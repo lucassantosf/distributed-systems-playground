@@ -200,15 +200,32 @@ class SagaEngine:
         if session is None:
             factory = self._resolve_session_factory()
             if factory:
+                command_to_publish = None
                 async with factory() as s:
                     async with s.begin():
-                        return await self.start_saga(order_id, payload, session=s)
+                        saga, command_to_publish = await self._start_saga_core(order_id, payload, session=s)
+                # Publica FORA do bloco de transação: garante que a Saga já está COMMITADA no banco
+                # antes de qualquer worker receber o comando e responder.
+                if command_to_publish:
+                    await self._publish(command_to_publish)
+                return saga
 
+        saga, command_to_publish = await self._start_saga_core(order_id, payload, session=session)
+        if command_to_publish:
+            await self._publish(command_to_publish)
+        return saga
+
+    async def _start_saga_core(
+        self,
+        order_id: str,
+        payload: Dict[str, Any],
+        session=None,
+    ) -> tuple[Saga, Optional[Dict[str, Any]]]:
         # 1. Idempotência a nível de order_id
         existing = await self._get_saga_by_order_id(session, order_id)
         if existing:
             logger.info(f"Saga já existente para order_id '{order_id}': id={existing.id}")
-            return existing
+            return existing, None
 
         now = datetime.now(timezone.utc)
         saga_id = uuid.uuid4()
@@ -284,17 +301,16 @@ class SagaEngine:
             },
         )
 
-        # Despacha o comando do Step 0
-        await self._publish({
+        command_dict = {
             "service": step_def_0.service,
             "command_type": step_def_0.command_type,
             "saga_id": str(saga.id),
             "command_id": step_0.command_id,
             "attempt": step_0.attempts,
             "payload": payload,
-        })
+        }
 
-        return saga
+        return saga, command_dict
 
     # -----------------------------------------------------------------------
     # Método 2: handle_reply
@@ -334,6 +350,11 @@ class SagaEngine:
         command_type = reply.get("command_type")
 
         saga = await self._get_saga_by_id(session, saga_id)
+        if not saga:
+            # Tolerância para eventuais transações assíncronas em processo de commit
+            await asyncio.sleep(0.05)
+            saga = await self._get_saga_by_id(session, saga_id)
+
         if not saga:
             logger.warning(f"Saga '{saga_id}' não encontrada ao processar reply.")
             return None

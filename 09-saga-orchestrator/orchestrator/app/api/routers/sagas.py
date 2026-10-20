@@ -1,29 +1,94 @@
+"""
+Router de Sagas: integração completa com SagaEngine + PostgreSQL.
+
+Card 3.3: POST /sagas dispara o fluxo real via SagaEngine (publica no RabbitMQ),
+os endpoints GET consultam o PostgreSQL via SagaRepository.
+"""
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 
+from fastapi import APIRouter, HTTPException, Query, Request, status
+
+from app.database import AsyncSessionLocal
+from app.repositories.saga_repository import (
+    get_events_by_saga_id,
+    get_saga_by_id,
+    list_sagas,
+)
 from app.schemas.saga import (
     CreateSagaRequest,
     CreateSagaResponse,
     SagaDetailResponse,
+    SagaEventResponse,
     SagaSummaryResponse,
     SagaTimelineResponse,
-    SagaEventResponse,
+    StepResponse,
 )
-from app.repositories.saga_store import saga_store
 
 logger = logging.getLogger("sagas-router")
 
 router = APIRouter(prefix="/sagas", tags=["Sagas"])
 
 
-async def trigger_first_step_async(saga_id: str, payload: dict):
-    """
-    Simula o disparo assíncrono do primeiro step da Saga.
-    No Epic 3 este disparo publicará o comando no RabbitMQ via SagaEngine.
-    """
-    logger.info(f"Disparo assíncrono do primeiro step iniciado para Saga {saga_id}")
+def _duration_ms(start, end) -> Optional[int]:
+    """Calcula duração em ms entre dois datetimes, ou None se ausente."""
+    if start and end:
+        return int((end - start).total_seconds() * 1000)
+    return None
 
+
+def _saga_to_detail(saga) -> SagaDetailResponse:
+    """Converte ORM Saga → SagaDetailResponse."""
+    # step corrente: nome do step no índice atual (ou último step)
+    current_step_name = None
+    if saga.steps:
+        idx = min(saga.current_step_index, len(saga.steps) - 1)
+        current_step_name = saga.steps[idx].step_name
+
+    steps = [
+        StepResponse(
+            name=s.step_name,
+            index=s.step_index,
+            status=s.status,
+            attempts=s.attempts,
+            started_at=s.started_at,
+            completed_at=s.completed_at,
+            duration_ms=_duration_ms(s.started_at, s.completed_at),
+            error_message=s.error_message,
+        )
+        for s in sorted(saga.steps, key=lambda x: x.step_index)
+    ]
+
+    return SagaDetailResponse(
+        saga_id=str(saga.id),
+        order_id=saga.order_id,
+        status=saga.status,
+        current_step=current_step_name,
+        started_at=saga.created_at,
+        completed_at=saga.completed_at,
+        duration_ms=_duration_ms(saga.created_at, saga.completed_at),
+        steps=steps,
+    )
+
+
+def _event_to_response(event) -> SagaEventResponse:
+    """Converte ORM SagaEvent → SagaEventResponse."""
+    step_name = None
+    if event.step:
+        step_name = event.step.step_name
+
+    return SagaEventResponse(
+        event_id=str(event.id),
+        event_type=event.event_type,
+        step=step_name,
+        created_at=event.created_at,
+        payload=event.event_payload or {},
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /sagas — inicia a Saga via SagaEngine (dispara fluxo real)
+# ---------------------------------------------------------------------------
 
 @router.post(
     "",
@@ -31,56 +96,57 @@ async def trigger_first_step_async(saga_id: str, payload: dict):
     status_code=status.HTTP_202_ACCEPTED,
     summary="Cria e inicia uma nova Saga",
 )
-async def create_saga(request: CreateSagaRequest, background_tasks: BackgroundTasks):
-    # Idempotência básica a nível de criação
-    existing = saga_store.list_all(order_id=request.order_id)
-    if existing:
-        saga = existing[0]
-        return CreateSagaResponse(
-            saga_id=saga["saga_id"],
-            order_id=saga["order_id"],
-            status=saga["status"],
-            message="Saga já existente para este order_id",
-        )
+async def create_saga(request: Request, body: CreateSagaRequest):
+    engine = request.app.state.engine
+    payload = body.model_dump()
 
-    saga_id = saga_store.create(order_id=request.order_id, payload=request.model_dump())
-    logger.info(f"Saga {saga_id} criada com status STARTED para order_id {request.order_id}")
-
-    # Dispara o primeiro step em background sem bloquear a resposta HTTP
-    background_tasks.add_task(trigger_first_step_async, saga_id, request.model_dump())
+    saga = await engine.start_saga(order_id=body.order_id, payload=payload)
+    logger.info(f"Saga {saga.id} criada com status {saga.status} para order_id {body.order_id}")
 
     return CreateSagaResponse(
-        saga_id=saga_id,
-        order_id=request.order_id,
-        status="STARTED",
-        message="Saga criada e primeiro step disparado assincronamente",
+        saga_id=str(saga.id),
+        order_id=saga.order_id,
+        status=saga.status,
+        message="Saga criada e primeiro step publicado no RabbitMQ",
     )
 
+
+# ---------------------------------------------------------------------------
+# GET /sagas — lista com filtros
+# ---------------------------------------------------------------------------
 
 @router.get(
     "",
     response_model=List[SagaSummaryResponse],
     summary="Lista Sagas com filtros",
 )
-async def list_sagas(
-    status: Optional[str] = Query(None, description="Filtrar por status"),
+async def list_sagas_endpoint(
+    status: Optional[str] = Query(None, description="Filtrar por status (ex: COMPLETED)"),
     order_id: Optional[str] = Query(None, description="Filtrar por order_id"),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    sagas = saga_store.list_all(status=status, order_id=order_id, limit=limit, offset=offset)
+    async with AsyncSessionLocal() as session:
+        sagas = await list_sagas(
+            session, status=status, order_id=order_id, limit=limit, offset=offset
+        )
+
     return [
         SagaSummaryResponse(
-            saga_id=s["saga_id"],
-            order_id=s["order_id"],
-            status=s["status"],
-            created_at=s["started_at"],
-            completed_at=s.get("completed_at"),
-            duration_ms=s.get("duration_ms"),
+            saga_id=str(s.id),
+            order_id=s.order_id,
+            status=s.status,
+            created_at=s.created_at,
+            completed_at=s.completed_at,
+            duration_ms=_duration_ms(s.created_at, s.completed_at),
         )
         for s in sagas
     ]
 
+
+# ---------------------------------------------------------------------------
+# GET /sagas/{saga_id} — detalhe completo
+# ---------------------------------------------------------------------------
 
 @router.get(
     "/{saga_id}",
@@ -88,14 +154,21 @@ async def list_sagas(
     summary="Retorna detalhes completos de uma Saga",
 )
 async def get_saga(saga_id: str):
-    saga = saga_store.get_by_id(saga_id)
+    async with AsyncSessionLocal() as session:
+        saga = await get_saga_by_id(session, saga_id)
+
     if not saga:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Saga '{saga_id}' não encontrada",
         )
-    return SagaDetailResponse(**saga)
 
+    return _saga_to_detail(saga)
+
+
+# ---------------------------------------------------------------------------
+# GET /sagas/{saga_id}/timeline — audit trail de eventos
+# ---------------------------------------------------------------------------
 
 @router.get(
     "/{saga_id}/timeline",
@@ -103,17 +176,19 @@ async def get_saga(saga_id: str):
     summary="Retorna o audit trail e linha do tempo de eventos da Saga",
 )
 async def get_saga_timeline(saga_id: str):
-    saga = saga_store.get_by_id(saga_id)
-    if not saga:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Saga '{saga_id}' não encontrada",
-        )
+    async with AsyncSessionLocal() as session:
+        saga = await get_saga_by_id(session, saga_id)
+        if not saga:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Saga '{saga_id}' não encontrada",
+            )
+        events = await get_events_by_saga_id(session, saga_id)
 
-    events = saga_store.get_events(saga_id)
+    event_responses = [_event_to_response(e) for e in events]
+
     return SagaTimelineResponse(
         saga_id=saga_id,
-        total_events=len(events),
-        events=[SagaEventResponse(**e) for e in events],
+        total_events=len(event_responses),
+        events=event_responses,
     )
-

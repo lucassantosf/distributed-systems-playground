@@ -21,6 +21,7 @@ class StepStatus(str, Enum):
     FAILED = "FAILED"
     COMPENSATING = "COMPENSATING"
     COMPENSATED = "COMPENSATED"
+    COMPENSATING_FAILED = "COMPENSATING_FAILED"
 
 
 class OrderItemSchema(BaseModel):

@@ -287,11 +287,11 @@ Implementar `publisher.py` que serializa o comando (`command_id`, `command_type`
 
 Implementar `consumer.py` como asyncio task iniciada no `lifespan` do FastAPI, consumindo `saga.replies` em loop contínuo. Faz `ack` apenas após `engine.handle_reply` concluir com sucesso — em caso de exceção, faz `nack` com `requeue=False` para a mensagem ir para a DLQ.
 
-**[ ] Card 3.3 — Fluxo Happy Path Completo**
+**[OK] Card 3.3 — Fluxo Happy Path Completo**
 
 Integrar Engine + Publisher + Consumer para que `POST /sagas` desencadeie o fluxo completo até `Saga COMPLETED`. Validar que todos os `SagaEvent`s foram registrados, o `current_step_index` foi atualizado a cada transição e o `GET /sagas/{id}` reflete o estado correto.
 
-**[ ] Card 3.4 — Script de Validação do Happy Path**
+**[OK] Card 3.4 — Script de Validação do Happy Path**
 
 Criar `verify_happy_path.py` que cria uma Saga, faz polling até `COMPLETED` (timeout 30s) e valida que todos os 4 steps estão `COMPLETED` com o número correto de eventos no timeline.
 
