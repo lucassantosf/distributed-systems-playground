@@ -110,6 +110,27 @@ class TestBusinessRules(unittest.TestCase):
         self.assertEqual(result, {"notified": True, "customer_id": "cust-123"})
         self.assertIsNone(error)
 
+    # 5. Unknown Commands (Validação de isolamento de filas e handlers)
+    def test_inventory_unknown_command_returns_false(self):
+        success, result, error = inventory_rules("ComandoInvalido", {})
+        self.assertFalse(success)
+        self.assertIn("não suportado", error)
+
+    def test_payment_unknown_command_returns_false(self):
+        success, result, error = payment_rules("ComandoInvalido", {})
+        self.assertFalse(success)
+        self.assertIn("não suportado", error)
+
+    def test_shipping_unknown_command_returns_false(self):
+        success, result, error = shipping_rules("ComandoInvalido", {})
+        self.assertFalse(success)
+        self.assertIn("não suportado", error)
+
+    def test_notification_unknown_command_returns_false(self):
+        success, result, error = notification_rules("ComandoInvalido", {})
+        self.assertFalse(success)
+        self.assertIn("não suportado", error)
+
 
 if __name__ == "__main__":
     unittest.main()

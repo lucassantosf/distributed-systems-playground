@@ -1,9 +1,10 @@
 import asyncio
 import json
 import uuid
+import os
 import aio_pika
 
-RABBITMQ_URL = "amqp://guest:guest@localhost:5672/"
+RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
 
 TEST_CASES = [
     {
@@ -17,9 +18,27 @@ TEST_CASES = [
         },
     },
     {
+        "service": "inventory (compensação)",
+        "queue": "inventory.commands",
+        "command_type": "LiberarEstoque",
+        "payload": {
+            "order_id": "test-order-1",
+            "items": [{"sku": "PROD-001", "quantity": 1}],
+        },
+    },
+    {
         "service": "payment",
         "queue": "payment.commands",
         "command_type": "ProcessarPagamento",
+        "payload": {
+            "order_id": "test-order-1",
+            "total_amount": 150.0,
+        },
+    },
+    {
+        "service": "payment (compensação)",
+        "queue": "payment.commands",
+        "command_type": "EstornarPagamento",
         "payload": {
             "order_id": "test-order-1",
             "total_amount": 150.0,
@@ -32,6 +51,14 @@ TEST_CASES = [
         "payload": {
             "order_id": "test-order-1",
             "shipping_address": "Rua Teste, 123",
+        },
+    },
+    {
+        "service": "shipping (compensação)",
+        "queue": "shipping.commands",
+        "command_type": "CancelarDespacho",
+        "payload": {
+            "order_id": "test-order-1",
         },
     },
     {

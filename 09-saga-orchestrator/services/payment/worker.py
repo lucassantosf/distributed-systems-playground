@@ -20,7 +20,9 @@ async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.C
             payload = body.get("payload", {})
             attempt = int(body.get("attempt", 1))
 
-            logger.info(f"Recebido '{command_type}' (id={command_id}, saga={saga_id}, attempt={attempt})")
+            is_comp = command_type == "EstornarPagamento"
+            prefix = "[COMPENSAÇÃO]" if is_comp else "[EXECUÇÃO]"
+            logger.info(f"{prefix} Recebido '{command_type}' (id={command_id}, saga={saga_id}, attempt={attempt})")
             success, result_data, error_message = apply_business_rules(command_type, payload, attempt)
 
             reply = {
@@ -41,7 +43,7 @@ async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.C
                 ),
                 routing_key="saga.replies",
             )
-            logger.info(f"Resposta publicada para '{command_type}': success={success}")
+            logger.info(f"{prefix} Resposta publicada para '{command_type}': success={success}")
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {e}", exc_info=True)
 

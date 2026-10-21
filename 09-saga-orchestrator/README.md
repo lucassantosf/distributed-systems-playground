@@ -299,11 +299,11 @@ Criar `verify_happy_path.py` que cria uma Saga, faz polling até `COMPLETED` (ti
 
 ### Epic 4 — Compensating Transactions (Rollback Distribuído)
 
-**[ ] Card 4.1 — Lógica de Compensação no SagaEngine**
+**[OK] Card 4.1 — Lógica de Compensação no SagaEngine**
 
 Implementar `start_compensation` no Engine: filtrar steps `COMPLETED` em ordem decrescente de `step_index` e publicar seus comandos de compensação. A Saga transiciona para `COMPENSATING` ao iniciar e para `COMPENSATED` quando todos os steps atingirem `COMPENSATED`.
 
-**[ ] Card 4.2 — Compensações nos Workers**
+**[OK] Card 4.2 — Compensações nos Workers**
 
 Implementar nos workers os handlers para `LiberarEstoque`, `EstornarPagamento` e `CancelarDespacho`, tratados na mesma fila de comandos e distinguidos por `command_type`. Steps que nunca completaram (ex: o step que falhou) não recebem compensação.
 
