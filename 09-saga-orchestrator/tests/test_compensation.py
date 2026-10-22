@@ -364,7 +364,8 @@ class TestCompensacao(unittest.IsolatedAsyncioTestCase):
             failure_reply(saga, 1, "ProcessarPagamento", "payment"), session=self.session
         )
 
-        # Step 0 falha na compensação (sem retry — já está no cenário de compensação)
+        # Step 0 falha na compensação com tentativas já esgotadas
+        saga.steps[0].attempts = ORDER_WORKFLOW.steps[0].compensation_max_attempts
         await self.engine.handle_reply(
             failure_reply(saga, 0, "LiberarEstoque", "inventory", "Erro crítico no estoque"),
             session=self.session,
@@ -375,6 +376,57 @@ class TestCompensacao(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(saga.completed_at)
 
         event_types = [e.event_type for e in saga.events]
+        self.assertIn("StepCompensationFailed", event_types)
+        self.assertIn("SagaFailed", event_types)
+
+    async def test_compensacao_executa_retries_antes_de_falhar(self):
+        """Card 4.4: Valida que a compensação tenta novamente até esgotar max_attempts."""
+        saga = await self._iniciar_saga("ORD-RETRY-COMP")
+
+        # Step 0 completa
+        await self.engine.handle_reply(
+            success_reply(saga, 0, "ReservarEstoque", "inventory"), session=self.session
+        )
+        # Step 1 falha e inicia compensação do step 0
+        saga.steps[1].attempts = ORDER_WORKFLOW.steps[1].max_attempts
+        await self.engine.handle_reply(
+            failure_reply(saga, 1, "ProcessarPagamento", "payment"), session=self.session
+        )
+
+        self.assertEqual(saga.steps[0].status, StepStatus.COMPENSATING)
+        self.assertEqual(saga.steps[0].attempts, 1)
+
+        # Tentativa 1 de compensação falha -> deve fazer retry (attempts vira 2)
+        cmd_id_1 = saga.steps[0].command_id
+        await self.engine.handle_reply(
+            failure_reply(saga, 0, "LiberarEstoque", "inventory", "Falha transitória na compensação"),
+            session=self.session,
+        )
+        self.assertEqual(saga.steps[0].status, StepStatus.COMPENSATING)
+        self.assertEqual(saga.steps[0].attempts, 2)
+        cmd_id_2 = saga.steps[0].command_id
+        self.assertNotEqual(cmd_id_1, cmd_id_2)
+
+        # Tentativa 2 de compensação falha -> retry (attempts vira 3)
+        await self.engine.handle_reply(
+            failure_reply(saga, 0, "LiberarEstoque", "inventory", "Falha transitória na compensação"),
+            session=self.session,
+        )
+        self.assertEqual(saga.steps[0].status, StepStatus.COMPENSATING)
+        self.assertEqual(saga.steps[0].attempts, 3)
+        cmd_id_3 = saga.steps[0].command_id
+        self.assertNotEqual(cmd_id_2, cmd_id_3)
+
+        # Tentativa 3 (esgotada) falha -> COMPENSATING_FAILED e Saga FAILED
+        await self.engine.handle_reply(
+            failure_reply(saga, 0, "LiberarEstoque", "inventory", "Falha persistente"),
+            session=self.session,
+        )
+        self.assertEqual(saga.steps[0].status, StepStatus.COMPENSATING_FAILED)
+        self.assertEqual(saga.status, SagaStatus.FAILED)
+
+        event_types = [e.event_type for e in saga.events]
+        self.assertEqual(event_types.count("StepCompensationRetried"), 2)
         self.assertIn("StepCompensationFailed", event_types)
         self.assertIn("SagaFailed", event_types)
 

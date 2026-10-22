@@ -26,6 +26,12 @@ verify-topology:
 verify-api:
 	docker compose exec orchestrator python -c "$$(cat scripts/verify_api.py)" || python3 scripts/verify_api.py
 
+verify-happy-path:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_happy_path.py)" || python3 scripts/verify_happy_path.py
+
+verify-compensation:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_compensation.py)" || python3 scripts/verify_compensation.py
+
 test:
 	python3 -m unittest discover -s tests -p "test_*.py"
 

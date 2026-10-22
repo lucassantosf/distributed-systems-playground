@@ -307,11 +307,11 @@ Implementar `start_compensation` no Engine: filtrar steps `COMPLETED` em ordem d
 
 Implementar nos workers os handlers para `LiberarEstoque`, `EstornarPagamento` e `CancelarDespacho`, tratados na mesma fila de comandos e distinguidos por `command_type`. Steps que nunca completaram (ex: o step que falhou) não recebem compensação.
 
-**[ ] Card 4.3 — Script de Validação de Compensação**
+**[OK] Card 4.3 — Script de Validação de Compensação**
 
 Criar `verify_compensation.py` que cria uma Saga com `total_amount > 9999.99` e valida que o Step 1 termina `COMPENSATED`, o Step 2 termina `FAILED`, a Saga atinge `COMPENSATED` e o timeline contém os eventos de rollback na ordem correta.
 
-**[ ] Card 4.4 — Retry na Compensação e Falha Irrecuperável**
+**[OK] Card 4.4 — Retry na Compensação e Falha Irrecuperável**
 
 Garantir que compensações também possuem retry com `max_attempts` próprio. Se esgotadas, o step fica em `COMPENSATING_FAILED` e a Saga em `FAILED` — estado que exige intervenção manual. Validar com `order_id` terminando em `"66"` e confirmar mensagem na `saga.dlq`.
 

@@ -178,6 +178,39 @@ class SagaEngine:
             logger.error(f"Erro ao publicar comando: {e}", exc_info=True)
             raise
 
+    async def _publish_to_dlq(
+        self,
+        saga: Saga,
+        step: SagaStep,
+        error_message: str,
+    ) -> None:
+        """
+        Publica notificação na DLQ (saga.dlx -> saga.dlq) quando
+        uma compensação falha de forma irrecuperável (exigindo intervenção manual).
+        """
+        if self.publisher is None:
+            return
+
+        try:
+            if hasattr(self.publisher, "publish_to_dlq"):
+                res = self.publisher.publish_to_dlq(
+                    saga_id=saga.id,
+                    payload={
+                        "order_id": saga.order_id,
+                        "step_name": step.step_name,
+                        "step_index": step.step_index,
+                        "command_id": step.command_id,
+                        "attempts": step.attempts,
+                        "error_message": error_message,
+                        "status": "COMPENSATING_FAILED",
+                    },
+                    reason="COMPENSATION_FAILED",
+                )
+                if asyncio.iscoroutine(res):
+                    await res
+        except Exception as e:
+            logger.error(f"Erro ao despachar alerta para DLQ: {e}", exc_info=True)
+
     # -----------------------------------------------------------------------
     # Método 1: start_saga
     # -----------------------------------------------------------------------
@@ -532,30 +565,72 @@ class SagaEngine:
                 # Aciona o próximo step a ser compensado em ordem decrescente
                 await self._trigger_next_compensation(saga, session=session)
             else:
-                # Falha irrecuperável na compensação (Card 4.4)
-                StepStateMachine.transition(matching_step, StepStatus.COMPENSATING_FAILED)
-                matching_step.failed_at = now
-                matching_step.error_message = error_message or "Falha na compensação do step"
-
-                SagaStateMachine.transition(saga, SagaStatus.FAILED)
-                saga.completed_at = now
-
-                self._record_event(
-                    session=session,
-                    saga=saga,
-                    step=matching_step,
-                    event_type="StepCompensationFailed",
-                    payload={"error": matching_step.error_message},
+                step_def = self.workflow.get_step_by_index(matching_step.step_index)
+                max_attempts = getattr(
+                    step_def,
+                    "compensation_max_attempts",
+                    getattr(step_def, "max_attempts", 3) if step_def else 1,
                 )
-                self._record_event(
-                    session=session,
-                    saga=saga,
-                    event_type="SagaFailed",
-                    payload={
-                        "reason": "Falha irrecuperável em compensação",
-                        "order_id": saga.order_id,
-                    },
-                )
+
+                if matching_step.attempts < max_attempts:
+                    matching_step.attempts += 1
+                    matching_step.command_id = str(uuid.uuid4())
+                    matching_step.started_at = now
+
+                    comp_command = step_def.compensation_command if step_def else command_type
+
+                    self._record_event(
+                        session=session,
+                        saga=saga,
+                        step=matching_step,
+                        event_type="StepCompensationRetried",
+                        payload={
+                            "command_id": matching_step.command_id,
+                            "attempt": matching_step.attempts,
+                            "max_attempts": max_attempts,
+                            "error": error_message,
+                            "command_type": comp_command,
+                        },
+                    )
+
+                    await self._publish({
+                        "service": step_def.service if step_def else "unknown",
+                        "command_type": comp_command,
+                        "saga_id": str(saga.id),
+                        "command_id": matching_step.command_id,
+                        "attempt": matching_step.attempts,
+                        "payload": matching_step.payload or saga.payload,
+                    })
+                else:
+                    # Falha irrecuperável na compensação (todas as tentativas esgotadas)
+                    StepStateMachine.transition(matching_step, StepStatus.COMPENSATING_FAILED)
+                    matching_step.failed_at = now
+                    matching_step.error_message = error_message or "Falha na compensação do step"
+
+                    SagaStateMachine.transition(saga, SagaStatus.FAILED)
+                    saga.completed_at = now
+
+                    self._record_event(
+                        session=session,
+                        saga=saga,
+                        step=matching_step,
+                        event_type="StepCompensationFailed",
+                        payload={
+                            "error": matching_step.error_message,
+                            "attempts": matching_step.attempts,
+                        },
+                    )
+                    self._record_event(
+                        session=session,
+                        saga=saga,
+                        event_type="SagaFailed",
+                        payload={
+                            "reason": "Falha irrecuperável em compensação",
+                            "order_id": saga.order_id,
+                        },
+                    )
+
+                    await self._publish_to_dlq(saga, matching_step, matching_step.error_message)
 
         return saga
 

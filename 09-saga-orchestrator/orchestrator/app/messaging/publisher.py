@@ -202,6 +202,77 @@ class CommandPublisher:
 
         return command_data
 
+    async def publish_to_dlq(
+        self,
+        saga_id: Union[str, uuid.UUID],
+        payload: Dict[str, Any],
+        reason: str = "COMPENSATION_FAILED",
+    ) -> Dict[str, Any]:
+        """
+        Publica mensagem no exchange Dead Letter (saga.dlx) para a fila saga.dlq.
+        Acionado quando as tentativas de compensação se esgotam (falha irrecuperável).
+        """
+        from datetime import datetime, timezone
+
+        data = {
+            "saga_id": str(saga_id),
+            "reason": reason,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **payload,
+        }
+        body_bytes = json.dumps(data, ensure_ascii=False).encode("utf-8")
+
+        channel = await self.get_channel()
+        dlx_name = getattr(settings, "EXCHANGE_DLX", os.getenv("EXCHANGE_DLX", "saga.dlx"))
+
+        if hasattr(channel, "declare_exchange"):
+            dlx_exchange = await channel.declare_exchange(
+                dlx_name,
+                type=ExchangeType.FANOUT,
+                durable=True,
+            )
+            if HAS_AIO_PIKA and aio_pika is not None:
+                message = aio_pika.Message(
+                    body=body_bytes,
+                    content_type="application/json",
+                    delivery_mode=DeliveryMode.PERSISTENT,
+                    headers={
+                        "saga_id": str(saga_id),
+                        "reason": reason,
+                    },
+                )
+            else:
+                class MockMessage:
+                    def __init__(self, body, content_type, delivery_mode, headers):
+                        self.body = body
+                        self.content_type = content_type
+                        self.delivery_mode = delivery_mode
+                        self.headers = headers
+
+                message = MockMessage(
+                    body=body_bytes,
+                    content_type="application/json",
+                    delivery_mode=DeliveryMode.PERSISTENT,
+                    headers={
+                        "saga_id": str(saga_id),
+                        "reason": reason,
+                    },
+                )
+
+            if hasattr(dlx_exchange, "publish"):
+                await dlx_exchange.publish(message, routing_key="")
+        elif hasattr(channel, "default_exchange") and hasattr(channel.default_exchange, "publish"):
+            await channel.default_exchange.publish(
+                aio_pika.Message(body=body_bytes, content_type="application/json"),
+                routing_key="saga.dlq",
+            )
+
+        logger.warning(
+            f"Mensagem de falha irrecuperável enviada para DLQ ({dlx_name}): "
+            f"saga_id={saga_id}, reason={reason}"
+        )
+        return data
+
     async def close(self) -> None:
         """Encerra canal e conexão se gerenciados internamente."""
         if self.channel is not None and not getattr(self.channel, "is_closed", False):

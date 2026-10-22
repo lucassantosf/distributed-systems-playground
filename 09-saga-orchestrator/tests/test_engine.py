@@ -280,7 +280,8 @@ class TestSagaEngine(unittest.IsolatedAsyncioTestCase):
             "error_message": "Erro fatal",
         }, session=self.session)
 
-        # Worker falha na compensação do Step 0
+        # Worker falha na compensação do Step 0 (tentativas esgotadas)
+        saga.steps[0].attempts = 3
         await self.engine.handle_reply({
             "saga_id": str(saga.id),
             "command_id": saga.steps[0].command_id,

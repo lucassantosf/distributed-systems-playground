@@ -18,6 +18,7 @@ class StepDefinition:
     compensation_command: Optional[str] = None
     timeout_seconds: int = DEFAULT_STEP_TIMEOUT_SECONDS
     max_attempts: int = DEFAULT_STEP_MAX_ATTEMPTS
+    compensation_max_attempts: int = DEFAULT_STEP_MAX_ATTEMPTS
 
     @property
     def has_compensation(self) -> bool:
