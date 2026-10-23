@@ -319,7 +319,7 @@ Garantir que compensações também possuem retry com `max_attempts` próprio. S
 
 ### Epic 5 — Retries e Timeouts
 
-**[ ] Card 5.1 — Retry com Backoff Exponencial**
+**[OK] Card 5.1 — Retry com Backoff Exponencial**
 
 Quando `handle_reply` recebe falha com tentativas restantes: incrementar `attempts`, calcular `delay = base_delay * 2^(attempts-1)` com jitter de ±10% e agendar re-publicação via `asyncio.create_task`. Um novo `command_id` é gerado por tentativa; o campo `attempt` no payload informa ao mock em qual tentativa está.
 

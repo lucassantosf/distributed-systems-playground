@@ -7,13 +7,14 @@ Toda ação relevante registra um SagaEvent imutável para rastreabilidade compl
 """
 import asyncio
 import logging
+import random
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from app.core.enums import SagaStatus, StepStatus
 from app.core.state_machine import SagaStateMachine, StepStateMachine
-from app.core.workflow import ORDER_WORKFLOW, StepDefinition, WorkflowDefinition
+from app.core.workflow import ORDER_WORKFLOW, DEFAULT_RETRY_BASE_DELAY, StepDefinition, WorkflowDefinition
 from app.models.saga import Saga, SagaStep, SagaEvent
 
 logger = logging.getLogger("saga-engine")
@@ -210,6 +211,50 @@ class SagaEngine:
                     await res
         except Exception as e:
             logger.error(f"Erro ao despachar alerta para DLQ: {e}", exc_info=True)
+
+    async def _schedule_retry(
+        self,
+        command_data: Dict[str, Any],
+        attempt: int,
+        base_delay: float = DEFAULT_RETRY_BASE_DELAY,
+    ) -> None:
+        """
+        Agenda a re-publicação de um comando com backoff exponencial e jitter.
+
+        Fórmula: delay = base_delay * 2^(attempt-1) * jitter
+        Jitter: fator aleatório uniforme em [0.9, 1.1] (±10%).
+
+        Cada tentativa recebe um delay crescente, evitando sobrecarga em retries
+        simultâneos (thundering herd). O comando é publicado após o delay via
+        asyncio.create_task, não bloqueando o handle_reply.
+        """
+        exponent = attempt - 1
+        delay = base_delay * (2 ** exponent)
+        jitter = random.uniform(0.9, 1.1)
+        delay_com_jitter = delay * jitter
+
+        logger.info(
+            f"[Retry] Agendando tentativa {attempt} em {delay_com_jitter:.3f}s "
+            f"para saga={command_data.get('saga_id')} "
+            f"step={command_data.get('command_type')}"
+        )
+
+        await asyncio.sleep(delay_com_jitter)
+        await self._publish(command_data)
+
+    def _create_retry_task(
+        self,
+        command_data: Dict[str, Any],
+        attempt: int,
+        base_delay: float = DEFAULT_RETRY_BASE_DELAY,
+    ) -> asyncio.Task:
+        """
+        Cria uma asyncio.Task para re-publicar o comando com backoff exponencial.
+        Retorna a Task para que o chamador possa cancelá-la se necessário (ex: timeout).
+        """
+        return asyncio.create_task(
+            self._schedule_retry(command_data, attempt, base_delay)
+        )
 
     # -----------------------------------------------------------------------
     # Método 1: start_saga
@@ -519,14 +564,20 @@ class SagaEngine:
                         },
                     )
 
-                    await self._publish({
-                        "service": step_def.service,
-                        "command_type": step_def.command_type,
-                        "saga_id": str(saga.id),
-                        "command_id": matching_step.command_id,
-                        "attempt": matching_step.attempts,
-                        "payload": matching_step.payload or saga.payload,
-                    })
+                    # Retry com backoff exponencial (Card 5.1):
+                    # Agenda re-publicação via asyncio.create_task para não bloquear
+                    # o handle_reply enquanto o delay transcorre.
+                    self._create_retry_task(
+                        command_data={
+                            "service": step_def.service,
+                            "command_type": step_def.command_type,
+                            "saga_id": str(saga.id),
+                            "command_id": matching_step.command_id,
+                            "attempt": matching_step.attempts,
+                            "payload": matching_step.payload or saga.payload,
+                        },
+                        attempt=matching_step.attempts,
+                    )
                 else:
                     # Tentativas esgotadas: falha o step e inicia compensação
                     StepStateMachine.transition(matching_step, StepStatus.FAILED)
@@ -593,14 +644,20 @@ class SagaEngine:
                         },
                     )
 
-                    await self._publish({
-                        "service": step_def.service if step_def else "unknown",
-                        "command_type": comp_command,
-                        "saga_id": str(saga.id),
-                        "command_id": matching_step.command_id,
-                        "attempt": matching_step.attempts,
-                        "payload": matching_step.payload or saga.payload,
-                    })
+                    # Retry com backoff exponencial (Card 5.1):
+                    # Agenda re-publicação via asyncio.create_task para não bloquear
+                    # o handle_reply enquanto o delay transcorre.
+                    self._create_retry_task(
+                        command_data={
+                            "service": step_def.service if step_def else "unknown",
+                            "command_type": comp_command,
+                            "saga_id": str(saga.id),
+                            "command_id": matching_step.command_id,
+                            "attempt": matching_step.attempts,
+                            "payload": matching_step.payload or saga.payload,
+                        },
+                        attempt=matching_step.attempts,
+                    )
                 else:
                     # Falha irrecuperável na compensação (todas as tentativas esgotadas)
                     StepStateMachine.transition(matching_step, StepStatus.COMPENSATING_FAILED)

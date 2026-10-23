@@ -4,6 +4,7 @@ from typing import List, Optional
 
 DEFAULT_STEP_TIMEOUT_SECONDS = int(os.getenv("STEP_TIMEOUT_SECONDS", "5"))
 DEFAULT_STEP_MAX_ATTEMPTS = int(os.getenv("STEP_MAX_ATTEMPTS", "3"))
+DEFAULT_RETRY_BASE_DELAY = float(os.getenv("RETRY_BASE_DELAY_SECONDS", "0.5"))
 
 
 @dataclass(frozen=True)
