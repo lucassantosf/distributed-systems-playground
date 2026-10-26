@@ -323,7 +323,7 @@ Garantir que compensações também possuem retry com `max_attempts` próprio. S
 
 Quando `handle_reply` recebe falha com tentativas restantes: incrementar `attempts`, calcular `delay = base_delay * 2^(attempts-1)` com jitter de ±10% e agendar re-publicação via `asyncio.create_task`. Um novo `command_id` é gerado por tentativa; o campo `attempt` no payload informa ao mock em qual tentativa está.
 
-**[ ] Card 5.2 — Timeout Configurável por Step**
+**[OK] Card 5.2 — Timeout Configurável por Step**
 
 Ao publicar um comando, criar uma `asyncio.Task` que aguarda `timeout_seconds` e chama `handle_timeout`. Quando a reply chega, a task é cancelada via `task.cancel()`. O `handle_timeout` verifica se o step ainda está `RUNNING` antes de agir e registra o evento `StepTimeout` no audit trail.
 

@@ -46,6 +46,9 @@ class SagaEngine:
         self.session_factory = session_factory
         self.workflow = workflow
         self.publisher = publisher
+        # Mapa de command_id → asyncio.Task de timeout (Card 5.2)
+        # Permite cancelar o timer exatamente quando a reply chega.
+        self._timeout_tasks: Dict[str, asyncio.Task] = {}
 
     # -----------------------------------------------------------------------
     # Helper: Sessão e Persistência
@@ -241,6 +244,13 @@ class SagaEngine:
 
         await asyncio.sleep(delay_com_jitter)
         await self._publish(command_data)
+        # Arma watchdog de timeout após a publicação do retry (Card 5.2)
+        self._arm_timeout(
+            saga_id=command_data.get("saga_id", ""),
+            step_index=command_data.get("step_index", -1),
+            command_id=command_data.get("command_id", ""),
+            timeout_seconds=command_data.get("timeout_seconds", 0),
+        )
 
     def _create_retry_task(
         self,
@@ -255,6 +265,71 @@ class SagaEngine:
         return asyncio.create_task(
             self._schedule_retry(command_data, attempt, base_delay)
         )
+
+    async def _run_timeout_watchdog(
+        self,
+        saga_id: str,
+        step_index: int,
+        command_id: str,
+        timeout_seconds: float,
+    ) -> None:
+        """
+        Watchdog de timeout para um step: aguarda `timeout_seconds` e, se a task
+        não for cancelada antes (pelo cancel_timeout quando a reply chega),
+        aciona handle_timeout para tratar o step como expirado.
+        """
+        try:
+            await asyncio.sleep(timeout_seconds)
+            # Se chegou aqui, a reply não chegou a tempo — dispara o timeout
+            logger.warning(
+                f"[Timeout] Step {step_index} da Saga {saga_id} expirou após "
+                f"{timeout_seconds}s (command_id={command_id})"
+            )
+            await self.handle_timeout(saga_id, step_index)
+        except asyncio.CancelledError:
+            # Reply chegou antes do timeout — task cancelada corretamente
+            logger.debug(
+                f"[Timeout] Watchdog cancelado para command_id={command_id} "
+                f"(reply recebida antes do timeout)"
+            )
+        finally:
+            # Limpa o mapa independentemente do motivo
+            self._timeout_tasks.pop(command_id, None)
+
+    def _arm_timeout(
+        self,
+        saga_id: str,
+        step_index: int,
+        command_id: str,
+        timeout_seconds: float,
+    ) -> None:
+        """
+        Arma o watchdog de timeout para o command_id fornecido.
+
+        Cria uma asyncio.Task que aguarda timeout_seconds e chama handle_timeout
+        se não for cancelada antes. Se timeout_seconds <= 0, o timeout é desabilitado.
+        """
+        if timeout_seconds <= 0:
+            return
+
+        task = asyncio.create_task(
+            self._run_timeout_watchdog(saga_id, step_index, command_id, timeout_seconds)
+        )
+        self._timeout_tasks[command_id] = task
+        logger.debug(
+            f"[Timeout] Watchdog armado: command_id={command_id} "
+            f"saga={saga_id} step={step_index} timeout={timeout_seconds}s"
+        )
+
+    def _cancel_timeout(self, command_id: str) -> None:
+        """
+        Cancela o watchdog de timeout associado ao command_id, se existir.
+        Chamado quando a reply de um comando chega antes do timeout expirar.
+        """
+        task = self._timeout_tasks.pop(command_id, None)
+        if task and not task.done():
+            task.cancel()
+            logger.debug(f"[Timeout] Watchdog cancelado para command_id={command_id}")
 
     # -----------------------------------------------------------------------
     # Método 1: start_saga
@@ -286,11 +361,25 @@ class SagaEngine:
                 # antes de qualquer worker receber o comando e responder.
                 if command_to_publish:
                     await self._publish(command_to_publish)
+                    # Arma o watchdog de timeout para o step 0 (Card 5.2)
+                    self._arm_timeout(
+                        saga_id=command_to_publish["saga_id"],
+                        step_index=command_to_publish.get("step_index", 0),
+                        command_id=command_to_publish["command_id"],
+                        timeout_seconds=command_to_publish.get("timeout_seconds", 0),
+                    )
                 return saga
 
         saga, command_to_publish = await self._start_saga_core(order_id, payload, session=session)
         if command_to_publish:
             await self._publish(command_to_publish)
+            # Arma o watchdog de timeout para o step 0 (Card 5.2)
+            self._arm_timeout(
+                saga_id=command_to_publish["saga_id"],
+                step_index=command_to_publish.get("step_index", 0),
+                command_id=command_to_publish["command_id"],
+                timeout_seconds=command_to_publish.get("timeout_seconds", 0),
+            )
         return saga
 
     async def _start_saga_core(
@@ -386,6 +475,9 @@ class SagaEngine:
             "command_id": step_0.command_id,
             "attempt": step_0.attempts,
             "payload": payload,
+            # Metadados para armar o timeout após a publicação (Card 5.2)
+            "step_index": 0,
+            "timeout_seconds": step_def_0.timeout_seconds,
         }
 
         return saga, command_dict
@@ -463,6 +555,10 @@ class SagaEngine:
 
         now = datetime.now(timezone.utc)
 
+        # Cancela o watchdog de timeout para este command_id (Card 5.2):
+        # a reply chegou a tempo, então o timer não deve disparar.
+        self._cancel_timeout(command_id)
+
         # Proteção contra respostas duplicadas / tardias (Card 6.3)
         if matching_step.status in (
             StepStatus.COMPLETED,
@@ -529,6 +625,13 @@ class SagaEngine:
                         "attempt": next_step.attempts,
                         "payload": next_step.payload or saga.payload,
                     })
+                    # Arma o watchdog de timeout para o próximo step (Card 5.2)
+                    self._arm_timeout(
+                        saga_id=str(saga.id),
+                        step_index=next_index,
+                        command_id=next_step.command_id,
+                        timeout_seconds=next_step_def.timeout_seconds,
+                    )
                 else:
                     # Todos os steps concluídos com sucesso!
                     SagaStateMachine.transition(saga, SagaStatus.COMPLETED)
@@ -575,6 +678,9 @@ class SagaEngine:
                             "command_id": matching_step.command_id,
                             "attempt": matching_step.attempts,
                             "payload": matching_step.payload or saga.payload,
+                            # Inclui metadados para armar o timeout após o publish (Card 5.2)
+                            "step_index": matching_step.step_index,
+                            "timeout_seconds": step_def.timeout_seconds,
                         },
                         attempt=matching_step.attempts,
                     )
