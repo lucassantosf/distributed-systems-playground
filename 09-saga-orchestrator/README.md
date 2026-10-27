@@ -327,11 +327,11 @@ Quando `handle_reply` recebe falha com tentativas restantes: incrementar `attemp
 
 Ao publicar um comando, criar uma `asyncio.Task` que aguarda `timeout_seconds` e chama `handle_timeout`. Quando a reply chega, a task é cancelada via `task.cancel()`. O `handle_timeout` verifica se o step ainda está `RUNNING` antes de agir e registra o evento `StepTimeout` no audit trail.
 
-**[ ] Card 5.3 — Script de Validação de Timeout**
+**[OK] Card 5.3 — Script de Validação de Timeout**
 
 Criar `verify_timeout.py` para o cenário de timeout no shipping (`order_id` terminando em `"88"`): aguardar o timeout disparar, verificar o evento `StepTimeout` no timeline e confirmar que a Saga termina `COMPENSATED` com os steps anteriores compensados.
 
-**[ ] Card 5.4 — Configuração por Variáveis de Ambiente**
+**[OK] Card 5.4 — Configuração por Variáveis de Ambiente**
 
 Expor `STEP_TIMEOUT_SECONDS`, `STEP_MAX_ATTEMPTS` e `RETRY_BASE_DELAY_SECONDS` via env vars com defaults razoáveis. Incluir valores acelerados no `docker-compose.yml` (ex: `STEP_TIMEOUT_SECONDS=5`) para que os scripts de verificação rodem em segundos, não minutos.
 

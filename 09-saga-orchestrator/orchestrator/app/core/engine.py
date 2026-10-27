@@ -537,15 +537,27 @@ class SagaEngine:
                 break
 
         if not matching_step:
-            # Fallback por índice atual se command_id não bater
-            if 0 <= saga.current_step_index < len(saga.steps):
-                candidate = saga.steps[saga.current_step_index]
+            # Tolerância para eventuais transações assíncronas em processo de commit
+            await asyncio.sleep(0.05)
+            reloaded = await self._get_saga_by_id(session, saga_id)
+            if reloaded:
+                saga = reloaded
+                for step in saga.steps:
+                    if step.command_id == command_id:
+                        matching_step = step
+                        break
+
+        if not matching_step:
+            # Fallback procurando em todos os steps pelo command_type ou compensation_command
+            for candidate in saga.steps:
                 step_def = self.workflow.get_step_by_index(candidate.step_index)
                 if step_def and (
                     step_def.command_type == command_type
                     or step_def.compensation_command == command_type
                 ):
                     matching_step = candidate
+                    matching_step.command_id = command_id
+                    break
 
         if not matching_step:
             logger.warning(
@@ -560,16 +572,34 @@ class SagaEngine:
         self._cancel_timeout(command_id)
 
         # Proteção contra respostas duplicadas / tardias (Card 6.3)
-        if matching_step.status in (
-            StepStatus.COMPLETED,
-            StepStatus.COMPENSATED,
-            StepStatus.COMPENSATING_FAILED,
-        ):
-            logger.info(
-                f"Reply duplicada/tardia ignorada: step {matching_step.step_name} "
-                f"já está em status terminal {matching_step.status}."
-            )
-            return saga
+        step_def = self.workflow.get_step_by_index(matching_step.step_index)
+        is_compensation_reply = bool(
+            step_def and step_def.compensation_command == command_type
+        )
+
+        if is_compensation_reply:
+            if matching_step.status in (
+                StepStatus.COMPENSATED,
+                StepStatus.COMPENSATING_FAILED,
+            ):
+                logger.info(
+                    f"Reply de compensação duplicada/tardia ignorada: step {matching_step.step_name} "
+                    f"já está em status terminal {matching_step.status}."
+                )
+                return saga
+            if matching_step.status == StepStatus.COMPLETED:
+                StepStateMachine.transition(matching_step, StepStatus.COMPENSATING)
+        else:
+            if matching_step.status in (
+                StepStatus.COMPLETED,
+                StepStatus.COMPENSATED,
+                StepStatus.COMPENSATING_FAILED,
+            ):
+                logger.info(
+                    f"Reply duplicada/tardia ignorada: step {matching_step.step_name} "
+                    f"já está em status terminal {matching_step.status}."
+                )
+                return saga
 
         # -------------------------------------------------------------------
         # Cenário A: Resposta para execução normal (RUNNING)

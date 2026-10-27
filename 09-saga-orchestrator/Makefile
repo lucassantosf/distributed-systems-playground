@@ -32,6 +32,9 @@ verify-happy-path:
 verify-compensation:
 	docker compose exec orchestrator python -c "$$(cat scripts/verify_compensation.py)" || python3 scripts/verify_compensation.py
 
+verify-timeout:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_timeout.py)" || python3 scripts/verify_timeout.py
+
 test:
 	python3 -m unittest discover -s tests -p "test_*.py"
 
