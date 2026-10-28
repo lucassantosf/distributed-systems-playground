@@ -50,6 +50,7 @@ class StepResponse(BaseModel):
     name: str
     index: int
     status: StepStatus
+    command_id: Optional[str] = None
     attempts: int = 1
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

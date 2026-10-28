@@ -2,9 +2,31 @@ import asyncio
 import json
 import logging
 import os
-import aio_pika
 
-from rules import apply_business_rules
+try:
+    import aio_pika
+except ImportError:
+    class _DummyMessage:
+        def __init__(self, body, correlation_id=None, content_type=None, headers=None, delivery_mode=None):
+            self.body = body
+            self.correlation_id = correlation_id
+            self.content_type = content_type
+            self.headers = headers
+            self.delivery_mode = delivery_mode
+
+    class _DummyAioPika:
+        Message = _DummyMessage
+        IncomingMessage = Any if "Any" in globals() else object
+        Channel = Any if "Any" in globals() else object
+
+    aio_pika = _DummyAioPika
+
+try:
+    from . import idempotency_store
+    from .rules import apply_business_rules
+except ImportError:
+    import idempotency_store
+    from rules import apply_business_rules
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("inventory-worker")
@@ -23,17 +45,21 @@ async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.C
             is_comp = command_type == "LiberarEstoque"
             prefix = "[COMPENSAÇÃO]" if is_comp else "[EXECUÇÃO]"
             logger.info(f"{prefix} Recebido '{command_type}' (id={command_id}, saga={saga_id}, attempt={attempt})")
-            success, result_data, error_message = apply_business_rules(command_type, payload, attempt)
 
-            reply = {
-                "command_id": command_id,
-                "saga_id": saga_id,
-                "command_type": command_type,
-                "service": "inventory",
-                "success": success,
-                "payload": result_data,
-                "error_message": error_message,
-            }
+            # Card 6.2 — Idempotência: retorna resultado cacheado sem re-executar
+            reply = idempotency_store.get(command_id)
+            if reply is None:
+                success, result_data, error_message = apply_business_rules(command_type, payload, attempt)
+                reply = {
+                    "command_id": command_id,
+                    "saga_id": saga_id,
+                    "command_type": command_type,
+                    "service": "inventory",
+                    "success": success,
+                    "payload": result_data,
+                    "error_message": error_message,
+                }
+                idempotency_store.save(command_id, reply)
 
             await channel.default_exchange.publish(
                 aio_pika.Message(
@@ -43,7 +69,7 @@ async def process_message(message: aio_pika.IncomingMessage, channel: aio_pika.C
                 ),
                 routing_key="saga.replies",
             )
-            logger.info(f"{prefix} Resposta publicada para '{command_type}': success={success}")
+            logger.info(f"{prefix} Resposta publicada para '{command_type}': success={reply.get('success')}")
         except Exception as e:
             logger.error(f"Erro ao processar mensagem: {e}", exc_info=True)
 

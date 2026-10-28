@@ -35,6 +35,9 @@ verify-compensation:
 verify-timeout:
 	docker compose exec orchestrator python -c "$$(cat scripts/verify_timeout.py)" || python3 scripts/verify_timeout.py
 
+verify-idempotency:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_idempotency.py)" || python3 scripts/verify_idempotency.py
+
 test:
 	python3 -m unittest discover -s tests -p "test_*.py"
 

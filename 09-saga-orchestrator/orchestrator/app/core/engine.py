@@ -63,7 +63,12 @@ class SagaEngine:
         except Exception:
             return None
 
-    async def _get_saga_by_id(self, session, saga_id: Union[str, uuid.UUID]) -> Optional[Saga]:
+    async def _get_saga_by_id(
+        self,
+        session,
+        saga_id: Union[str, uuid.UUID],
+        for_update: bool = False,
+    ) -> Optional[Saga]:
         if session is None:
             return None
 
@@ -85,10 +90,35 @@ class SagaEngine:
                 .where(Saga.id == uid)
                 .options(selectinload(Saga.steps), selectinload(Saga.events))
             )
+            if for_update:
+                stmt = stmt.with_for_update()
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
         except Exception as exc:
             logger.debug(f"Fallback ao buscar saga_id {saga_id}: {exc}")
+            return None
+
+    async def _lock_step_by_command_id(self, session, command_id: str) -> Optional[SagaStep]:
+        """
+        Executa SELECT FOR UPDATE em SagaStep pelo command_id para prevenir race conditions
+        entre múltiplas réplicas do orquestrador recebendo replies duplicadas concorrentes (Card 6.3).
+        """
+        if session is None or not command_id:
+            return None
+
+        if hasattr(session, "lock_step"):
+            res = session.lock_step(command_id)
+            if asyncio.iscoroutine(res):
+                return await res
+            return res
+
+        try:
+            from sqlalchemy import select
+            stmt = select(SagaStep).where(SagaStep.command_id == command_id).with_for_update()
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as exc:
+            logger.debug(f"Fallback ao travar step por command_id {command_id}: {exc}")
             return None
 
     async def _get_saga_by_order_id(self, session, order_id: str) -> Optional[Saga]:
@@ -519,11 +549,11 @@ class SagaEngine:
         result_data = reply.get("payload") or {}
         command_type = reply.get("command_type")
 
-        saga = await self._get_saga_by_id(session, saga_id)
+        saga = await self._get_saga_by_id(session, saga_id, for_update=True)
         if not saga:
             # Tolerância para eventuais transações assíncronas em processo de commit
             await asyncio.sleep(0.05)
-            saga = await self._get_saga_by_id(session, saga_id)
+            saga = await self._get_saga_by_id(session, saga_id, for_update=True)
 
         if not saga:
             logger.warning(f"Saga '{saga_id}' não encontrada ao processar reply.")
@@ -539,7 +569,7 @@ class SagaEngine:
         if not matching_step:
             # Tolerância para eventuais transações assíncronas em processo de commit
             await asyncio.sleep(0.05)
-            reloaded = await self._get_saga_by_id(session, saga_id)
+            reloaded = await self._get_saga_by_id(session, saga_id, for_update=True)
             if reloaded:
                 saga = reloaded
                 for step in saga.steps:
@@ -565,6 +595,9 @@ class SagaEngine:
             )
             return saga
 
+        # Card 6.3 — SELECT FOR UPDATE no SagaStep para evitar race conditions
+        await self._lock_step_by_command_id(session, command_id)
+
         now = datetime.now(timezone.utc)
 
         # Cancela o watchdog de timeout para este command_id (Card 5.2):
@@ -583,8 +616,8 @@ class SagaEngine:
                 StepStatus.COMPENSATING_FAILED,
             ):
                 logger.info(
-                    f"Reply de compensação duplicada/tardia ignorada: step {matching_step.step_name} "
-                    f"já está em status terminal {matching_step.status}."
+                    f"duplicate reply ignored: reply de compensação duplicada/tardia ignorada para step "
+                    f"'{matching_step.step_name}' (status={matching_step.status}, command_id={command_id})."
                 )
                 return saga
             if matching_step.status == StepStatus.COMPLETED:
@@ -596,8 +629,8 @@ class SagaEngine:
                 StepStatus.COMPENSATING_FAILED,
             ):
                 logger.info(
-                    f"Reply duplicada/tardia ignorada: step {matching_step.step_name} "
-                    f"já está em status terminal {matching_step.status}."
+                    f"duplicate reply ignored: reply duplicada/tardia ignorada para step "
+                    f"'{matching_step.step_name}' (status={matching_step.status}, command_id={command_id})."
                 )
                 return saga
 

@@ -50,6 +50,7 @@ def _saga_to_detail(saga) -> SagaDetailResponse:
             name=s.step_name,
             index=s.step_index,
             status=s.status,
+            command_id=s.command_id,
             attempts=s.attempts,
             started_at=s.started_at,
             completed_at=s.completed_at,

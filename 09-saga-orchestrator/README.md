@@ -339,19 +339,19 @@ Expor `STEP_TIMEOUT_SECONDS`, `STEP_MAX_ATTEMPTS` e `RETRY_BASE_DELAY_SECONDS` v
 
 ### Epic 6 — Idempotência
 
-**[ ] Card 6.1 — Idempotency Key nos Comandos**
+**[OK] Card 6.1 — Idempotency Key nos Comandos**
 
 O `command_id` (UUID v4) é a idempotency key de cada tentativa: gerado pelo Engine, persistido no `SagaStep.command_id` (coluna UNIQUE), enviado no payload e retornado intacto no reply. Em retry, um novo `command_id` é gerado — cada tentativa é semanticamente uma nova requisição ao serviço.
 
-**[ ] Card 6.2 — Serviços Mockados Idempotentes**
+**[OK] Card 6.2 — Serviços Mockados Idempotentes**
 
 Cada worker mantém um dicionário `{command_id: reply_payload}`. Se um `command_id` já visto chegar, retornar o resultado anterior sem re-executar a lógica de negócio. Simula o comportamento de serviços reais (ex: gateways de pagamento com idempotency-key).
 
-**[ ] Card 6.3 — Proteção contra Replies Duplicadas**
+**[OK] Card 6.3 — Proteção contra Replies Duplicadas**
 
 O `handle_reply` deve verificar, dentro de uma transação com `SELECT FOR UPDATE`, se o `SagaStep` já está em status terminal antes de processar. Se sim, fazer `ack` e ignorar — evitando race conditions em cenários de múltiplas instâncias do orquestrador rodando em paralelo.
 
-**[ ] Card 6.4 — Script de Validação de Idempotência**
+**[OK] Card 6.4 — Script de Validação de Idempotência**
 
 Criar `verify_idempotency.py` que, após o Step 1 completar, re-publica manualmente sua reply em `saga.replies` e verifica que a Saga progride normalmente sem processar o Step 1 uma segunda vez — confirmando nos logs a mensagem de "duplicate reply ignored".
 
@@ -397,6 +397,3 @@ Criar `stress_test.py` que dispara N Sagas (default 100), mede throughput (Sagas
 
 ---
 
-## 📚 Lessons Learned
-
-*(a preencher ao longo da implementação)*
