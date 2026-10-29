@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 from app.core.enums import SagaStatus, StepStatus
 from app.core.state_machine import SagaStateMachine, StepStateMachine
+from app.core.structured_logging import saga_context, set_saga_context
 from app.core.workflow import ORDER_WORKFLOW, DEFAULT_RETRY_BASE_DELAY, StepDefinition, WorkflowDefinition
 from app.models.saga import Saga, SagaStep, SagaEvent
 
@@ -482,6 +483,14 @@ class SagaEngine:
         step_0.command_id = str(uuid.uuid4())
         step_0.started_at = now
 
+        # Propaga contexto estruturado (Card 7.4)
+        set_saga_context(
+            saga_id=str(saga.id),
+            step_name=step_0.step_name,
+            command_id=step_0.command_id,
+            attempt=step_0.attempts,
+        )
+
         # 6. Registra StepStarted
         self._record_event(
             session=session,
@@ -549,6 +558,14 @@ class SagaEngine:
         result_data = reply.get("payload") or {}
         command_type = reply.get("command_type")
 
+        # Propaga contexto estruturado para o processamento da reply (Card 7.4)
+        set_saga_context(
+            saga_id=str(saga_id) if saga_id else None,
+            command_id=str(command_id) if command_id else None,
+            step_name=str(command_type) if command_type else None,
+            attempt=int(reply.get("attempt", 1)),
+        )
+
         saga = await self._get_saga_by_id(session, saga_id, for_update=True)
         if not saga:
             # Tolerância para eventuais transações assíncronas em processo de commit
@@ -597,6 +614,12 @@ class SagaEngine:
 
         # Card 6.3 — SELECT FOR UPDATE no SagaStep para evitar race conditions
         await self._lock_step_by_command_id(session, command_id)
+
+        # Contexto enriquecido com dados do step encontrado (Card 7.4)
+        set_saga_context(
+            step_name=matching_step.step_name,
+            attempt=matching_step.attempts,
+        )
 
         now = datetime.now(timezone.utc)
 
@@ -665,6 +688,13 @@ class SagaEngine:
                     next_step.command_id = str(uuid.uuid4())
                     next_step.started_at = now
 
+                    # Contexto do próximo step (Card 7.4)
+                    set_saga_context(
+                        step_name=next_step.step_name,
+                        command_id=next_step.command_id,
+                        attempt=next_step.attempts,
+                    )
+
                     self._record_event(
                         session=session,
                         saga=saga,
@@ -716,6 +746,12 @@ class SagaEngine:
                     matching_step.attempts += 1
                     matching_step.command_id = str(uuid.uuid4())
                     matching_step.started_at = now
+
+                    # Contexto do retry com novo command_id e attempt incrementado (Card 7.4)
+                    set_saga_context(
+                        command_id=matching_step.command_id,
+                        attempt=matching_step.attempts,
+                    )
 
                     self._record_event(
                         session=session,
@@ -796,6 +832,12 @@ class SagaEngine:
                     matching_step.attempts += 1
                     matching_step.command_id = str(uuid.uuid4())
                     matching_step.started_at = now
+
+                    # Contexto do retry com novo command_id e attempt incrementado (Card 7.4)
+                    set_saga_context(
+                        command_id=matching_step.command_id,
+                        attempt=matching_step.attempts,
+                    )
 
                     comp_command = step_def.compensation_command if step_def else command_type
 

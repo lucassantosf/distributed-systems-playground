@@ -39,11 +39,16 @@ def _duration_ms(start, end) -> Optional[int]:
 
 def _saga_to_detail(saga) -> SagaDetailResponse:
     """Converte ORM Saga → SagaDetailResponse."""
-    # step corrente: nome do step no índice atual (ou último step)
+    # Identifica o step corrente: preferência para o step ativamente em execução/compensação
     current_step_name = None
     if saga.steps:
-        idx = min(saga.current_step_index, len(saga.steps) - 1)
-        current_step_name = saga.steps[idx].step_name
+        for s in saga.steps:
+            if s.status in (StepStatus.RUNNING, StepStatus.COMPENSATING):
+                current_step_name = s.step_name
+                break
+        if not current_step_name:
+            idx = min(saga.current_step_index, len(saga.steps) - 1)
+            current_step_name = saga.steps[idx].step_name
 
     steps = [
         StepResponse(
@@ -66,6 +71,7 @@ def _saga_to_detail(saga) -> SagaDetailResponse:
         status=saga.status,
         current_step=current_step_name,
         started_at=saga.created_at,
+        updated_at=getattr(saga, "updated_at", None),
         completed_at=saga.completed_at,
         duration_ms=_duration_ms(saga.created_at, saga.completed_at),
         steps=steps,
@@ -75,8 +81,10 @@ def _saga_to_detail(saga) -> SagaDetailResponse:
 def _event_to_response(event) -> SagaEventResponse:
     """Converte ORM SagaEvent → SagaEventResponse."""
     step_name = None
-    if event.step:
+    if getattr(event, "step", None):
         step_name = event.step.step_name
+    elif getattr(event, "event_payload", None) and isinstance(event.event_payload, dict):
+        step_name = event.event_payload.get("step_name")
 
     return SagaEventResponse(
         event_id=str(event.id),
@@ -119,17 +127,25 @@ async def create_saga(request: Request, body: CreateSagaRequest):
 @router.get(
     "",
     response_model=List[SagaSummaryResponse],
-    summary="Lista Sagas com filtros",
+    summary="Lista Sagas com filtros e paginação",
 )
 async def list_sagas_endpoint(
     status: Optional[str] = Query(None, description="Filtrar por status (ex: COMPLETED)"),
     order_id: Optional[str] = Query(None, description="Filtrar por order_id"),
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    from_date: Optional[datetime] = Query(None, description="Data/hora inicial (ISO-8601)"),
+    to_date: Optional[datetime] = Query(None, description="Data/hora final (ISO-8601)"),
+    limit: int = Query(50, ge=1, le=100, description="Quantidade máxima de itens por página"),
+    offset: int = Query(0, ge=0, description="Deslocamento para paginação"),
 ):
     async with AsyncSessionLocal() as session:
         sagas = await list_sagas(
-            session, status=status, order_id=order_id, limit=limit, offset=offset
+            session,
+            status=status,
+            order_id=order_id,
+            from_date=from_date,
+            to_date=to_date,
+            limit=limit,
+            offset=offset,
         )
 
     return [
@@ -189,7 +205,9 @@ async def get_saga_timeline(saga_id: str):
     event_responses = [_event_to_response(e) for e in events]
 
     return SagaTimelineResponse(
-        saga_id=saga_id,
+        saga_id=str(saga.id),
+        order_id=saga.order_id,
+        status=saga.status,
         total_events=len(event_responses),
         events=event_responses,
     )

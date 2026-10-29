@@ -359,19 +359,19 @@ Criar `verify_idempotency.py` que, após o Step 1 completar, re-publica manualme
 
 ### Epic 7 — Observabilidade do Workflow
 
-**[ ] Card 7.1 — Endpoint de Status da Saga**
+**[OK] Card 7.1 — Endpoint de Status da Saga**
 
 `GET /sagas/{saga_id}` retorna status, `current_step`, timestamps, `duration_ms` e a lista de steps com status individual, número de tentativas e duração. Permite acompanhar o progresso em tempo real.
 
-**[ ] Card 7.2 — Endpoint de Timeline / Audit Trail**
+**[OK] Card 7.2 — Endpoint de Timeline / Audit Trail**
 
 `GET /sagas/{saga_id}/timeline` retorna todos os `SagaEvent`s em ordem cronológica com `event_type`, `step` e `payload`. O audit trail é a "caixa-preta" do workflow: permite reconstruir exatamente o que aconteceu e quando — essencial para debugging e suporte.
 
-**[ ] Card 7.3 — Listagem e Filtros de Sagas**
+**[OK] Card 7.3 — Listagem e Filtros de Sagas**
 
 `GET /sagas` com filtros por `status`, `order_id`, `from_date`/`to_date` e paginação via `limit`/`offset`. Retorna lista resumida (sem steps e events) para não sobrecarregar a resposta em listagens.
 
-**[ ] Card 7.4 — Logs Estruturados com Contexto da Saga**
+**[OK] Card 7.4 — Logs Estruturados com Contexto da Saga**
 
 Configurar o logger para emitir JSON com `saga_id`, `step_name`, `command_id` e `attempt` em todos os logs de execução. Usar `contextvars.ContextVar` para propagar o contexto sem poluir as assinaturas de função.
 

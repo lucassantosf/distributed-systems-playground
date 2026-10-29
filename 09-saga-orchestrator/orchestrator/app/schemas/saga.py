@@ -64,6 +64,7 @@ class SagaDetailResponse(BaseModel):
     status: SagaStatus
     current_step: Optional[str] = None
     started_at: datetime
+    updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     duration_ms: Optional[int] = None
     steps: List[StepResponse] = []
@@ -88,6 +89,8 @@ class SagaEventResponse(BaseModel):
 
 class SagaTimelineResponse(BaseModel):
     saga_id: str
+    order_id: Optional[str] = None
+    status: Optional[SagaStatus] = None
     total_events: int
     events: List[SagaEventResponse]
 

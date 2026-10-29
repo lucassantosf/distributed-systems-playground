@@ -12,6 +12,7 @@ import logging
 import os
 from typing import Any, Callable, Dict, Optional
 
+from app.core.structured_logging import saga_context
 logger = logging.getLogger("saga-consumer")
 
 try:
@@ -65,17 +66,23 @@ class RepliesConsumer:
             command_type = reply_data.get("command_type")
             success = reply_data.get("success")
 
-            logger.info(
-                f"Processando reply recebida: {command_type} "
-                f"[command_id={command_id}, saga_id={saga_id}, success={success}]"
-            )
+            with saga_context(
+                saga_id=saga_id,
+                command_id=command_id,
+                step_name=command_type,
+                attempt=reply_data.get("attempt", 1),
+            ):
+                logger.info(
+                    f"Processando reply recebida: {command_type} "
+                    f"[command_id={command_id}, saga_id={saga_id}, success={success}]"
+                )
 
-            # Executa a transição no engine
-            await self.engine.handle_reply(reply_data)
+                # Executa a transição no engine
+                await self.engine.handle_reply(reply_data)
 
-            # Confirma o processamento com sucesso
-            await message.ack()
-            logger.info(f"ACK enviado com sucesso para command_id={command_id}")
+                # Confirma o processamento com sucesso
+                await message.ack()
+                logger.info(f"ACK enviado com sucesso para command_id={command_id}")
 
         except Exception as exc:
             logger.error(

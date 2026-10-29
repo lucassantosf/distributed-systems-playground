@@ -4,6 +4,7 @@ import aio_pika
 from fastapi import FastAPI
 
 from app.config import settings
+from app.core.structured_logging import setup_structured_logging
 from app.messaging.topology import setup_rabbitmq_topology
 from app.messaging.publisher import CommandPublisher
 from app.messaging.consumer import start_replies_consumer, stop_replies_consumer
@@ -11,7 +12,7 @@ from app.core.engine import SagaEngine
 from app.database import AsyncSessionLocal
 from app.api.routers import sagas
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+setup_structured_logging()
 logger = logging.getLogger("orchestrator")
 
 
