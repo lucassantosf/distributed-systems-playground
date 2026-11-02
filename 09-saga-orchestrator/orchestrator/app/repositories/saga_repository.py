@@ -8,9 +8,16 @@ from datetime import datetime
 import uuid
 from typing import List, Optional, Union
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+try:
+    from sqlalchemy import select
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.orm import selectinload
+    HAS_SQLALCHEMY = True
+except ImportError:
+    HAS_SQLALCHEMY = False
+    select = None
+    AsyncSession = Any = object
+    selectinload = None
 
 from app.core.enums import SagaStatus
 from app.models.saga import Saga, SagaEvent, SagaStep
@@ -92,4 +99,32 @@ async def get_events_by_saga_id(session: AsyncSession, saga_id: str) -> List[Sag
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def find_stuck_running_steps(
+    session: AsyncSession,
+    older_than_seconds: int = 10,
+) -> List[tuple[Saga, SagaStep]]:
+    """
+    Localiza Sagas e Steps que estão em status RUNNING há mais de N segundos (Card 8.2).
+    Usado no startup/recovery do orquestrador para retomar workflows interrompidos
+    por falha/crash do container.
+    """
+    from datetime import timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=older_than_seconds)
+
+    from app.core.enums import StepStatus
+
+    stmt = (
+        select(Saga, SagaStep)
+        .join(SagaStep, SagaStep.saga_id == Saga.id)
+        .where(
+            Saga.status == SagaStatus.RUNNING,
+            SagaStep.status == StepStatus.RUNNING,
+            SagaStep.started_at <= cutoff,
+        )
+        .options(selectinload(Saga.steps), selectinload(Saga.events))
+    )
+    result = await session.execute(stmt)
+    return list(result.all())
 

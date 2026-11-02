@@ -4,6 +4,7 @@ import aio_pika
 from fastapi import FastAPI
 
 from app.config import settings
+from app.core.distributed_lock import RedisDistributedLock
 from app.core.structured_logging import setup_structured_logging
 from app.messaging.topology import setup_rabbitmq_topology
 from app.messaging.publisher import CommandPublisher
@@ -30,16 +31,31 @@ async def lifespan(app: FastAPI):
         app.state.rabbitmq_channel = channel
         logger.info("Topologia RabbitMQ pronta para uso.")
 
-        # Instancia publisher, engine e consumer
+        # Instancia publisher, lock distribuído, engine e consumer
         publisher = CommandPublisher(channel=channel)
-        engine = SagaEngine(session_factory=AsyncSessionLocal, publisher=publisher)
+        dist_lock = RedisDistributedLock(redis_url=settings.REDIS_URL)
+        engine = SagaEngine(
+            session_factory=AsyncSessionLocal,
+            publisher=publisher,
+            distributed_lock=dist_lock,
+        )
         app.state.publisher = publisher
+        app.state.distributed_lock = dist_lock
         app.state.engine = engine
 
         # Inicia consumer de replies como asyncio task em background
         consumer_task = start_replies_consumer(channel=channel, engine=engine)
         app.state.consumer_task = consumer_task
         logger.info("Consumer de replies iniciado como asyncio task.")
+
+        # Recovery após falha do orquestrador (Card 8.2)
+        threshold = getattr(settings, "RECOVERY_RUNNING_THRESHOLD_SECONDS", 10)
+        logger.info(f"[Recovery] Escaneando Sagas interrompidas (RUNNING > {threshold}s)...")
+        recovered = await engine.recover_stuck_sagas(threshold_seconds=threshold)
+        if recovered:
+            logger.info(f"[Recovery] {len(recovered)} Saga(s) recuperada(s) e re-publicada(s): {recovered}")
+        else:
+            logger.info("[Recovery] Nenhuma Saga pendente de recuperação encontrada.")
     except Exception as e:
         logger.error(f"Erro ao conectar ou configurar RabbitMQ/Consumer: {e}", exc_info=True)
 

@@ -379,19 +379,19 @@ Configurar o logger para emitir JSON com `saga_id`, `step_name`, `command_id` e 
 
 ### Epic 8 — Cenários Avançados e Stress Test
 
-**[ ] Card 8.1 — Script de Cenários Determinísticos Completos**
+**[OK] Card 8.1 — Script de Cenários Determinísticos Completos**
 
 Criar `verify_all_scenarios.py` que executa os 6 cenários da tabela de falhas em sequência e imprime um relatório `PASSED/FAILED` consolidado para cada um.
 
-**[ ] Card 8.2 — Recovery após Falha do Orquestrador**
+**[OK] Card 8.2 — Recovery após Falha do Orquestrador**
 
 No `lifespan`, o orquestrador faz scan no banco por Sagas com steps em `RUNNING` há mais de N segundos e re-publica seus comandos. Validar: derrubar o container no meio de uma Saga, reiniciar e confirmar que ela conclui normalmente graças à idempotência do `command_id`.
 
-**[ ] Card 8.3 — Sagas Concorrentes em Paralelo**
+**[OK] Card 8.3 — Sagas Concorrentes em Paralelo**
 
 Disparar 20 Sagas em paralelo via `asyncio.gather` e validar que todas chegam ao status final esperado sem interferência entre elas. O Redis é usado como lock distribuído (`SET NX EX`) no `handle_reply` para evitar race conditions em scale-out do orquestrador.
 
-**[ ] Card 8.4 — Stress Test de Throughput**
+**[OK] Card 8.4 — Stress Test de Throughput**
 
 Criar `stress_test.py` que dispara N Sagas (default 100), mede throughput (Sagas/s) e latência P50/P95/P99 de ponta a ponta, e valida que 0 Sagas ficam travadas sem status final.
 

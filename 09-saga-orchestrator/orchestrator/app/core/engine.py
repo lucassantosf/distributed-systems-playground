@@ -37,16 +37,19 @@ class SagaEngine:
         session_factory=None,
         workflow: WorkflowDefinition = ORDER_WORKFLOW,
         publisher=None,
+        distributed_lock=None,
     ):
         """
         Args:
             session_factory: fábrica de AsyncSession (ex: AsyncSessionLocal).
             workflow: definição do workflow a ser orquestrado.
             publisher: publicador de comandos (objeto com publish_command ou callable).
+            distributed_lock: instância de RedisDistributedLock (Card 8.3).
         """
         self.session_factory = session_factory
         self.workflow = workflow
         self.publisher = publisher
+        self.distributed_lock = distributed_lock
         # Mapa de command_id → asyncio.Task de timeout (Card 5.2)
         # Permite cancelar o timer exatamente quando a reply chega.
         self._timeout_tasks: Dict[str, asyncio.Task] = {}
@@ -363,6 +366,88 @@ class SagaEngine:
             logger.debug(f"[Timeout] Watchdog cancelado para command_id={command_id}")
 
     # -----------------------------------------------------------------------
+    # Recovery no Startup (Card 8.2)
+    # -----------------------------------------------------------------------
+
+    async def recover_stuck_sagas(
+        self,
+        threshold_seconds: int = 10,
+        session=None,
+    ) -> List[dict]:
+        """
+        Recupera Sagas interrompidas por falha/reinício do orquestrador (Card 8.2).
+        1. Localiza steps em RUNNING há mais de threshold_seconds.
+        2. Registra o evento SagaRecoveryTriggered.
+        3. Re-publica o comando com o MESMO command_id existente (idempotência).
+        4. Re-arma o watchdog de timeout.
+        """
+        if session is None:
+            factory = self._resolve_session_factory()
+            if factory:
+                async with factory() as s:
+                    async with s.begin():
+                        return await self.recover_stuck_sagas(threshold_seconds=threshold_seconds, session=s)
+
+        from app.repositories.saga_repository import find_stuck_running_steps
+        stuck_pairs = await find_stuck_running_steps(session, older_than_seconds=threshold_seconds)
+
+        recovered: List[dict] = []
+        for saga, step in stuck_pairs:
+            step_def = self.workflow.get_step_by_index(step.step_index)
+            if not step_def:
+                continue
+
+            logger.warning(
+                f"[Recovery] Retomando Saga interrompida {saga.id} (order_id={saga.order_id}) "
+                f"no step {step.step_index} ({step.step_name}), command_id={step.command_id}"
+            )
+
+            # Registra evento de auditoria de recovery
+            self._record_event(
+                session=session,
+                saga=saga,
+                step=step,
+                event_type="SagaRecoveryTriggered",
+                payload={
+                    "order_id": saga.order_id,
+                    "step_name": step.step_name,
+                    "step_index": step.step_index,
+                    "command_id": step.command_id,
+                    "attempt": step.attempts,
+                    "threshold_seconds": threshold_seconds,
+                },
+            )
+
+            # Prepara comando com o MESMO command_id já existente (idempotência preservada)
+            cmd_data = {
+                "service": step_def.service,
+                "command_type": step_def.command_type,
+                "saga_id": str(saga.id),
+                "command_id": step.command_id,
+                "attempt": step.attempts,
+                "payload": step.payload or saga.payload,
+                "step_index": step.step_index,
+                "timeout_seconds": step_def.timeout_seconds,
+            }
+
+            await self._publish(cmd_data)
+            self._arm_timeout(
+                saga_id=str(saga.id),
+                step_index=step.step_index,
+                command_id=step.command_id,
+                timeout_seconds=step_def.timeout_seconds,
+            )
+
+            recovered.append({
+                "saga_id": str(saga.id),
+                "order_id": saga.order_id,
+                "step_index": step.step_index,
+                "command_id": step.command_id,
+            })
+
+        return recovered
+
+    # -----------------------------------------------------------------------
     # Método 1: start_saga
     # -----------------------------------------------------------------------
 
@@ -547,6 +632,16 @@ class SagaEngine:
         if session is None:
             factory = self._resolve_session_factory()
             if factory:
+                # Lock Distribuído com Redis (Card 8.3)
+                lock_manager = getattr(self, "distributed_lock", None)
+                lock_key = reply.get("command_id") or reply.get("saga_id") or "default"
+
+                if lock_manager is not None and hasattr(lock_manager, "lock"):
+                    async with lock_manager.lock(lock_key, expire_seconds=10):
+                        async with factory() as s:
+                            async with s.begin():
+                                return await self.handle_reply(reply, session=s)
+
                 async with factory() as s:
                     async with s.begin():
                         return await self.handle_reply(reply, session=s)

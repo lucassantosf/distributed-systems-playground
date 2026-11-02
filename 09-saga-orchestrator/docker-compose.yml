@@ -65,6 +65,7 @@ services:
       STEP_TIMEOUT_SECONDS: 5
       STEP_MAX_ATTEMPTS: 3
       RETRY_BASE_DELAY_SECONDS: 0.5
+      RECOVERY_RUNNING_THRESHOLD_SECONDS: 5
     depends_on:
       postgres:
         condition: service_healthy

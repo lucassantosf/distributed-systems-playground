@@ -38,6 +38,18 @@ verify-timeout:
 verify-idempotency:
 	docker compose exec orchestrator python -c "$$(cat scripts/verify_idempotency.py)" || python3 scripts/verify_idempotency.py
 
+verify-all-scenarios:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_all_scenarios.py)" || python3 scripts/verify_all_scenarios.py
+
+verify-recovery:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_recovery.py)" || python3 scripts/verify_recovery.py
+
+verify-concurrent:
+	docker compose exec orchestrator python -c "$$(cat scripts/verify_concurrent_sagas.py)" || python3 scripts/verify_concurrent_sagas.py
+
+stress-test:
+	docker compose exec orchestrator python -c "$$(cat scripts/stress_test.py)" || python3 scripts/stress_test.py
+
 test:
 	python3 -m unittest discover -s tests -p "test_*.py"
 
