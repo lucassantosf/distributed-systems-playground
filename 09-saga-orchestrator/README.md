@@ -176,35 +176,69 @@ O padrão Saga Orchestration é baseado em **command/reply**: o orquestrador env
 ├── orchestrator/
 │   ├── app/
 │   │   ├── api/routers/
-│   │   │   ├── sagas.py         # POST /sagas, GET /sagas, GET /sagas/{id}/timeline
-│   │   │   └── health.py
+│   │   │   └── sagas.py              # POST /sagas, GET /sagas, GET /sagas/{id}, GET /sagas/{id}/timeline
 │   │   ├── core/
-│   │   │   ├── engine.py        # SagaEngine — coordena execução e compensação
-│   │   │   ├── state_machine.py # Transições de estado por step e por Saga
-│   │   │   └── workflow.py      # Definição declarativa do fluxo (steps + compensações)
+│   │   │   ├── engine.py             # SagaEngine — coordena execução e compensação
+│   │   │   ├── state_machine.py      # Transições de estado por step e por Saga
+│   │   │   ├── workflow.py           # Definição declarativa do fluxo (steps + compensações)
+│   │   │   ├── distributed_lock.py   # Lock distribuído via Redis (SET NX EX)
+│   │   │   ├── enums.py              # SagaStatus, StepStatus, CommandType
+│   │   │   └── structured_logging.py # JSON logging com contexto via ContextVar
 │   │   ├── messaging/
-│   │   │   ├── publisher.py     # Publica comandos → {service}.commands
-│   │   │   └── consumer.py      # Consome replies ← saga.replies (asyncio task)
-│   │   ├── models/saga.py       # Saga, SagaStep, SagaEvent (SQLAlchemy)
+│   │   │   ├── publisher.py          # Publica comandos → {service}.commands
+│   │   │   ├── consumer.py           # Consome replies ← saga.replies (asyncio task)
+│   │   │   └── topology.py           # Declaração idempotente de exchanges/filas/bindings
+│   │   ├── models/saga.py            # Saga, SagaStep, SagaEvent (SQLAlchemy)
 │   │   ├── repositories/saga_repository.py
 │   │   ├── schemas/saga.py
 │   │   ├── config.py
-│   │   └── main.py              # FastAPI app + lifespan (inicia consumer)
+│   │   └── main.py                   # FastAPI app + lifespan (inicia consumer, recovery)
 │   ├── alembic/
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── services/
-│   ├── inventory/worker.py
-│   ├── payment/worker.py
-│   ├── shipping/worker.py
-│   └── notification/worker.py
+│   ├── inventory/
+│   │   ├── worker.py           # Consumer de comandos + publisher de replies
+│   │   ├── rules.py            # apply_business_rules() isolada e testável
+│   │   └── idempotency_store.py
+│   ├── payment/   (mesma estrutura)
+│   ├── shipping/  (mesma estrutura)
+│   └── notification/ (mesma estrutura)
 ├── scripts/
 │   ├── verify_happy_path.py
 │   ├── verify_compensation.py
-│   ├── verify_retry.py
-│   ├── verify_idempotency.py
 │   ├── verify_timeout.py
-│   └── stress_test.py
+│   ├── verify_idempotency.py
+│   ├── verify_recovery.py
+│   ├── verify_concurrent_sagas.py
+│   ├── verify_all_scenarios.py
+│   ├── stress_test.py
+│   ├── verify_topology.py
+│   ├── verify_api.py
+│   └── test_workers.py
+├── tests/                       # Testes unitários (pytest, sem Docker)
+│   ├── test_engine.py
+│   ├── test_state_machine.py
+│   ├── test_workflow.py
+│   ├── test_compensation.py
+│   ├── test_retry.py
+│   ├── test_timeout.py
+│   ├── test_idempotency.py
+│   ├── test_recovery.py
+│   ├── test_consumer.py
+│   ├── test_publisher.py
+│   ├── test_distributed_lock.py
+│   ├── test_structured_logging.py
+│   ├── test_business_rules.py
+│   ├── test_worker_idempotency.py
+│   ├── test_duplicate_replies.py
+│   ├── test_router_sagas.py
+│   ├── test_saga_status_endpoint.py
+│   ├── test_timeline_endpoint.py
+│   ├── test_list_sagas_filters.py
+│   ├── test_env_config.py
+│   ├── test_stress_test_script.py
+│   └── test_all_scenarios_script.py
 ├── docker-compose.yml
 ├── Makefile
 └── README.md
@@ -215,11 +249,20 @@ O padrão Saga Orchestration é baseado em **command/reply**: o orquestrador env
 ## 🚀 Como Executar
 
 ```bash
-make up          # sobe todos os containers
-make migrate     # executa migrations do Alembic
-make health      # verifica saúde dos serviços
-make verify-happy  # valida o happy path completo
-make stress      # stress test de throughput
+make up                    # sobe todos os containers
+make migrate               # executa migrations do Alembic
+make health                # verifica saúde dos serviços
+make test                  # roda testes unitários (pytest, sem Docker)
+
+# Verificações end-to-end (requerem stack rodando)
+make verify-happy-path     # happy path completo
+make verify-compensation   # rollback distribuído
+make verify-timeout        # timeout + compensação automática
+make verify-idempotency    # proteção contra replies duplicadas
+make verify-recovery       # recovery após restart do orquestrador
+make verify-concurrent     # 20 sagas em paralelo
+make verify-all-scenarios  # todos os 6 cenários em sequência
+make stress-test           # throughput: N sagas, P50/P95/P99
 ```
 
 | Serviço | Porta |
@@ -396,4 +439,14 @@ Disparar 20 Sagas em paralelo via `asyncio.gather` e validar que todas chegam ao
 Criar `stress_test.py` que dispara N Sagas (default 100), mede throughput (Sagas/s) e latência P50/P95/P99 de ponta a ponta, e valida que 0 Sagas ficam travadas sem status final.
 
 ---
+
+## 🎓 Lições Aprendidas
+
+- **Orquestração vs. Coreografia**: o orquestrador centraliza o controle e simplifica debugging; a desvantagem é o acoplamento — o engine conhece todos os steps. Coreografia distribui a responsabilidade mas torna o fluxo mais difícil de rastrear.
+- **`command_id` como idempotency key**: gerar o ID no orquestrador (antes de publicar) e persistir no banco é o único jeito de garantir exatamente-uma-vez semântico entre orquestrador e serviço. Cada retry gera um novo `command_id` — cada tentativa é uma requisição nova.
+- **`SELECT FOR UPDATE` é essencial**: sem lock na leitura do step antes de processar a reply, múltiplas instâncias do orquestrador geram race conditions silenciosas — o step avança duas vezes sem erro aparente.
+- **Timeout cancelado via `task.cancel()`**: a task de timeout deve ser cancelada imediatamente ao receber a reply; não cancelar gera compensações espúrias mesmo após sucesso.
+- **Recovery por varredura no startup**: Sagas com steps em `RUNNING` há mais de N segundos indicam crash do orquestrador. Re-publicar o comando (com o mesmo `command_id`) é seguro graças à idempotência dos workers.
+- **Separar `rules.py` do `worker.py`**: a lógica de negócio isolada em uma função pura permite testar todos os cenários de falha sem RabbitMQ — os testes unitários são mais rápidos e determinísticos.
+- **DLQ como sinal de alerta**: mensagens na `saga.dlq` indicam falhas que esgotaram retries ou compensações irrecuperáveis — monitorar a fila é o primeiro passo em operação real.
 
