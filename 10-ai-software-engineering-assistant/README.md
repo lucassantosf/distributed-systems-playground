@@ -269,7 +269,7 @@ O projeto adota DDD de forma leve, principalmente para organizar o vocabulário 
 
 ### Epic 1 — Infraestrutura Base e Estrutura do Projeto
 
-**[*] Card 1.1 — Setup Inicial do Projeto e Estrutura de Pastas**
+**[OK] Card 1.1 — Setup Inicial do Projeto e Estrutura de Pastas**
 
 Criar a estrutura de pastas do projeto conforme definida na seção de Arquitetura de Software (`src/domain/`, `src/application/`, `src/infrastructure/`, `src/presentation/`). Inicializar o repositório com `docker-compose.yml` orquestrando os serviços: `api` (FastAPI) e `db` (PostgreSQL + pgvector). O backend deve ter uma rota `GET /health` que retorne `{ "status": "ok" }`. O `main.py` deve criar o app FastAPI e registrar os routers.
 
