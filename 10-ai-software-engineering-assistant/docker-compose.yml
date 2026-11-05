@@ -7,6 +7,10 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      # Garante que `import src.*` funcione em qualquer script ou ferramenta
+      # rodando dentro do container (alembic, scripts utilitários, etc.)
+      PYTHONPATH: /app
     volumes:
       - .:/app
     depends_on:

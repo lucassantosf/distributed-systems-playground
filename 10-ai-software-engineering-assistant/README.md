@@ -273,7 +273,7 @@ O projeto adota DDD de forma leve, principalmente para organizar o vocabulário 
 
 Criar a estrutura de pastas do projeto conforme definida na seção de Arquitetura de Software (`src/domain/`, `src/application/`, `src/infrastructure/`, `src/presentation/`). Inicializar o repositório com `docker-compose.yml` orquestrando os serviços: `api` (FastAPI) e `db` (PostgreSQL + pgvector). O backend deve ter uma rota `GET /health` que retorne `{ "status": "ok" }`. O `main.py` deve criar o app FastAPI e registrar os routers.
 
-**[*] Card 1.2 — Setup do PostgreSQL com pgvector e Migrations**
+**[OK] Card 1.2 — Setup do PostgreSQL com pgvector e Migrations**
 
 Configurar o container do PostgreSQL com a extensão `pgvector` habilitada. Criar as migrations iniciais com Alembic. Os **modelos SQLAlchemy** ficam em `infrastructure/persistence/models.py` — separados das entidades de domínio.
 
@@ -283,7 +283,7 @@ Tabelas a criar:
 
 Validar que a busca por similaridade (`<=>`) funciona com um script simples de smoke test inserindo 2 vetores e consultando o mais próximo.
 
-**[*] Card 1.3 — Configuração via Variáveis de Ambiente**
+**[OK] Card 1.3 — Configuração via Variáveis de Ambiente**
 
 Centralizar toda configuração em `.env` usando `pydantic-settings` em `src/settings.py`. Variáveis esperadas: `DATABASE_URL`, `OPENAI_API_KEY`, `GITHUB_TOKEN` (opcional, para maior rate limit), `EMBEDDING_MODEL` (default: `text-embedding-3-small`), `LLM_MODEL` (default: `gpt-4o-mini`), `VECTOR_SEARCH_TOP_K` (default: `5`). Incluir `.env.example` com valores fictícios documentados.
 
