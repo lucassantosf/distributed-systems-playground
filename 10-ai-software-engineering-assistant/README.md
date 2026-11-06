@@ -287,7 +287,7 @@ Validar que a busca por similaridade (`<=>`) funciona com um script simples de s
 
 Centralizar toda configuração em `.env` usando `pydantic-settings` em `src/settings.py`. Variáveis esperadas: `DATABASE_URL`, `OPENAI_API_KEY`, `GITHUB_TOKEN` (opcional, para maior rate limit), `EMBEDDING_MODEL` (default: `text-embedding-3-small`), `LLM_MODEL` (default: `gpt-4o-mini`), `VECTOR_SEARCH_TOP_K` (default: `5`). Incluir `.env.example` com valores fictícios documentados.
 
-**[*] Card 1.4 — Definição dos Contratos (Interfaces)**
+**[OK] Card 1.4 — Definição dos Contratos (Interfaces)**
 
 Criar os contratos em `src/application/interfaces/` como classes abstratas Python (usando `abc.ABC` e `@abstractmethod`):
 - `EmbeddingProvider`: método `embed(text: str) -> list[float]`
@@ -299,7 +299,7 @@ Criar os contratos em `src/application/interfaces/` como classes abstratas Pytho
 
 Esses contratos são o coração da Clean Architecture: os Use Cases dependem deles, nunca das implementações concretas.
 
-**[*] Card 1.5 — Dependency Injection em `dependencies.py`**
+**[OK] Card 1.5 — Dependency Injection em `dependencies.py`**
 
 Implementar `src/presentation/api/dependencies.py` como o ponto central de montagem das dependências. Este arquivo instancia as implementações concretas da infraestrutura e as injeta nos Use Cases via FastAPI `Depends`. Exemplo de responsabilidade: `get_chat_use_case()` retorna uma instância de `ChatWithRepository` já configurada com `OpenAIEmbeddingProvider`, `PgVectorStore` e `OpenAILLMProvider`.
 
