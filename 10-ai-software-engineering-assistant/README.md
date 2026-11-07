@@ -307,7 +307,7 @@ Implementar `src/presentation/api/dependencies.py` como o ponto central de monta
 
 ### Epic 2 — Integração com GitHub
 
-**[*] Card 2.1 — Endpoint de Submissão de Repositório**
+**[OK] Card 2.1 — Endpoint de Submissão de Repositório**
 
 Implementar os schemas Pydantic em `presentation/api/schemas/repo_schemas.py` e os endpoints em `presentation/api/routes/repos.py`:
 - `POST /repos`: recebe `{ "github_url": "https://github.com/owner/repo" }`, valida o formato da URL, converte para `IngestRepositoryDTO`, cria o registro via `RepositoryStore` com `status = "pending"`, despacha o Use Case `IngestRepository` em background via `TaskDispatcher` e retorna `{ "id": "uuid", "status": "pending" }` imediatamente — sem aguardar a ingestão terminar.

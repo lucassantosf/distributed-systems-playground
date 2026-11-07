@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from src.presentation.api.routes import health
+from src.presentation.api.routes import health, repos
 
 
 def create_app() -> FastAPI:
@@ -11,6 +11,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, tags=["health"])
+    app.include_router(repos.router)
 
     return app
 
