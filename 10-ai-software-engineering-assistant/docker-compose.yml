@@ -11,6 +11,7 @@ services:
       # Garante que `import src.*` funcione em qualquer script ou ferramenta
       # rodando dentro do container (alembic, scripts utilitários, etc.)
       PYTHONPATH: /app
+      PYTHONIOENCODING: utf-8
     volumes:
       - .:/app
     depends_on:

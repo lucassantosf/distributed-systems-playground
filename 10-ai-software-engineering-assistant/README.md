@@ -315,7 +315,7 @@ Implementar os schemas Pydantic em `presentation/api/schemas/repo_schemas.py` e 
 
 A rota **não** chama diretamente a infraestrutura — usa os contratos via injeção de dependências.
 
-**[*] Card 2.2 — GitHub API Client (`GithubRepositoryProvider`)**
+**[OK] Card 2.2 — GitHub API Client (`GithubRepositoryProvider`)**
 
 Criar `infrastructure/github/github_repository_provider.py` implementando o contrato `RepositoryProvider`. Usando a GitHub REST API v3:
 - Listar arquivos recursivamente via `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`

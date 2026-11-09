@@ -2,12 +2,15 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from src.application.interfaces.repository_provider import RepositoryProvider
 from src.application.interfaces.repository_store import RepositoryStore
 from src.application.interfaces.task_dispatcher import TaskDispatcher
 from src.application.use_cases.ingest_repository import IngestRepository
 from src.infrastructure.background.asyncio_task_dispatcher import AsyncioTaskDispatcher
+from src.infrastructure.github.github_repository_provider import GithubRepositoryProvider
 from src.infrastructure.persistence.database import get_db
 from src.infrastructure.persistence.pg_repository_store import PgRepositoryStore
+from src.settings import settings
 
 # Tipo auxiliar para injeção da sessão do SQLAlchemy
 DatabaseSession = Annotated[Session, Depends(get_db)]
@@ -23,6 +26,10 @@ def get_repository_store(db: DatabaseSession) -> RepositoryStore:
 
 def get_task_dispatcher() -> TaskDispatcher:
     return AsyncioTaskDispatcher()
+
+
+def get_repository_provider() -> RepositoryProvider:
+    return GithubRepositoryProvider(token=settings.github_token)
 
 
 # ==============================================================================
