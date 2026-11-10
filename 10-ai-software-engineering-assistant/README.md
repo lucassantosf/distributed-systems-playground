@@ -329,7 +329,7 @@ Retornar lista de `FileContent` (path + content como string).
 
 ### Epic 3 — Pipeline de Ingestão
 
-**[*] Card 3.1 — Use Case `IngestRepository`**
+**[OK] Card 3.1 — Use Case `IngestRepository`**
 
 Criar `application/use_cases/ingest_repository.py`. Este Use Case recebe um `IngestRepositoryDTO` (com `repo_id` e `github_url`) e orquestra:
 1. Atualiza `status` para `"indexing"` via `RepositoryStore`
@@ -341,11 +341,11 @@ Criar `application/use_cases/ingest_repository.py`. Este Use Case recebe um `Ing
 
 O Use Case depende apenas dos contratos — não conhece OpenAI, PostgreSQL ou GitHub.
 
-**[*] Card 3.2 — Code Chunker**
+**[OK] Card 3.2 — Code Chunker**
 
 Criar `src/application/chunker.py` como módulo auxiliar puro (sem dependências externas) com a lógica de chunking. Estratégia: quebrar o conteúdo de cada arquivo em blocos de tamanho fixo (ex: 400 linhas ou ~1500 caracteres) com overlap de 10% para preservar contexto entre chunks adjacentes. Arquivos menores que o tamanho máximo são tratados como um único chunk. Preservar metadados: `file_path` e `chunk_index`. Registrar nos logs quantos chunks foram gerados por arquivo. O Use Case `IngestRepository` chama o chunker internamente antes de gerar os embeddings.
 
-**[*] Card 3.3 — `OpenAIEmbeddingProvider`**
+**[OK] Card 3.3 — `OpenAIEmbeddingProvider`**
 
 Criar `infrastructure/embeddings/openai_embedding_provider.py` implementando o contrato `EmbeddingProvider`. Chamar a API de embeddings da OpenAI (modelo configurado via `EMBEDDING_MODEL`). Processar em batches de até 20 textos por requisição para respeitar limites de rate. Logar progresso (ex: `"Embedded 40/200 chunks for repo X"`).
 
@@ -355,7 +355,7 @@ Criar `infrastructure/persistence/pg_vector_store.py` implementando `VectorStore
 
 Criar `infrastructure/persistence/pg_repository_store.py` implementando `RepositoryStore`: `save`, `get_by_id` e `update_status` usando SQLAlchemy.
 
-**[*] Card 3.5 — `AsyncioTaskDispatcher`**
+**[OK] Card 3.5 — `AsyncioTaskDispatcher`**
 
 Criar `infrastructure/background/asyncio_task_dispatcher.py` implementando o contrato `TaskDispatcher` usando `asyncio.create_task`. Esta implementação é suficiente para a Fase 1 e será substituída por Celery na Fase 2 sem alterar nenhum Use Case ou rota — apenas a implementação registrada no `dependencies.py`.
 
