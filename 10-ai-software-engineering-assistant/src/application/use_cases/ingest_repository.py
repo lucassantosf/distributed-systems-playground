@@ -24,7 +24,7 @@ class IngestRepository:
         repository_store_factory: Callable[[], RepositoryStore],
         repository_provider: RepositoryProvider,
         embedding_provider: EmbeddingProvider | None,
-        vector_store: VectorStore | None,
+        vector_store_factory: Callable[[], VectorStore] | None,
         chunker: Callable[[list[FileContentDTO], any], list[CodeChunk]] | None = None,
     ):
         """
@@ -33,11 +33,14 @@ class IngestRepository:
                 RepositoryStore com sua própria sessão de banco. Necessário porque
                 o Use Case roda em background (após o request HTTP fechar),
                 logo não pode reusar a sessão SQLAlchemy do request.
+            vector_store_factory: Callable sem argumentos que retorna um novo
+                VectorStore com sua própria sessão de banco. Mesmo motivo acima.
+                Pode ser None enquanto Card 3.4 não estiver completo.
         """
         self.repository_store_factory = repository_store_factory
         self.repository_provider = repository_provider
         self.embedding_provider = embedding_provider
-        self.vector_store = vector_store
+        self.vector_store_factory = vector_store_factory
         self.chunker = chunker
 
     async def execute(self, dto: IngestRepositoryDTO) -> None:
@@ -82,6 +85,11 @@ class IngestRepository:
                     )
             logger.info(f"Total de {len(chunks)} chunks gerados para o repositório {dto.repo_id}")
 
+            if not chunks:
+                raise ValueError(
+                    f"Nenhum arquivo com extensão suportada ou conteúdo válido encontrado em {owner}/{repo}"
+                )
+
             # 4. Gerar embeddings em batch (skipa enquanto EmbeddingProvider não estiver disponível — card 3.3)
             if self.embedding_provider:
                 texts = [chunk.content for chunk in chunks]
@@ -93,9 +101,10 @@ class IngestRepository:
                     "EmbeddingProvider não configurado — embeddings não gerados (card 3.3 pendente)"
                 )
 
-            # 5. Persistir no VectorStore (skipa enquanto VectorStore não estiver disponível — card 3.4)
-            if self.vector_store and chunks:
-                self.vector_store.save_chunks(chunks)
+            # 5. Persistir no VectorStore
+            if self.vector_store_factory and chunks:
+                vector_store: VectorStore = self.vector_store_factory()
+                vector_store.save_chunks(chunks)
             elif chunks:
                 logger.warning(
                     "VectorStore não configurado — %d chunk(s) não persistidos (card 3.4 pendente)",

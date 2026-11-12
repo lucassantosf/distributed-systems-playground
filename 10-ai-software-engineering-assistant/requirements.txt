@@ -15,3 +15,6 @@ httpx==0.28.1
 # OpenAI SDK
 openai==1.57.0
 
+# Google Gemini SDK
+google-genai==1.12.1
+

@@ -167,8 +167,10 @@ src/
 │   ├── github/
 │   │   └── github_repository_provider.py  # Implementa RepositoryProvider usando GitHub REST API v3
 │   ├── llm/
+│   │   ├── gemini_llm_provider.py         # Implementa LLMProvider usando Google Gemini (padrão ativo)
 │   │   └── openai_llm_provider.py         # Implementa LLMProvider usando OpenAI Chat Completions
 │   ├── embeddings/
+│   │   ├── gemini_embedding_provider.py   # Implementa EmbeddingProvider usando Google Gemini (padrão ativo)
 │   │   └── openai_embedding_provider.py   # Implementa EmbeddingProvider usando OpenAI Embeddings
 │   ├── persistence/
 │   │   ├── models.py                      # Modelos SQLAlchemy (separados das entidades de domínio)
@@ -199,8 +201,8 @@ A tabela abaixo documenta cada contrato definido na camada de `application/inter
 | Necessidade do sistema | Contrato (`application/interfaces/`) | Implementação (`infrastructure/`) |
 |---|---|---|
 | Acessar arquivos do repositório | `RepositoryProvider` | `GithubRepositoryProvider` (GitHub REST API v3) |
-| Gerar embeddings de texto | `EmbeddingProvider` | `OpenAIEmbeddingProvider` (OpenAI Embeddings) |
-| Chamar um LLM | `LLMProvider` | `OpenAILLMProvider` (OpenAI Chat Completions) |
+| Gerar embeddings de texto | `EmbeddingProvider` | `GeminiEmbeddingProvider` (Google Gemini) / `OpenAIEmbeddingProvider` |
+| Chamar um LLM | `LLMProvider` | `GeminiLLMProvider` (Google Gemini) / `OpenAILLMProvider` |
 | Armazenar e buscar chunks | `VectorStore` | `PgVectorStore` (PostgreSQL + pgvector) |
 | Persistir metadados de repos | `RepositoryStore` | `PgRepositoryStore` (SQLAlchemy) |
 | Despachar tarefas em background | `TaskDispatcher` | `AsyncioTaskDispatcher` (asyncio.create_task) |
@@ -258,7 +260,7 @@ O projeto adota DDD de forma leve, principalmente para organizar o vocabulário 
 | Frontend | React |
 | Backend | FastAPI (Python) |
 | Banco vetorial | PostgreSQL + pgvector |
-| Embeddings / LLM | OpenAI API (ou compatível) |
+| Embeddings / LLM | Google Gemini API (Free Tier) / OpenAI API |
 | Integração GitHub | GitHub REST API v3 |
 | ORM / Migrations | SQLAlchemy + Alembic |
 | Containerização | Docker + Docker Compose |
@@ -349,7 +351,7 @@ Criar `src/application/chunker.py` como módulo auxiliar puro (sem dependências
 
 Criar `infrastructure/embeddings/openai_embedding_provider.py` implementando o contrato `EmbeddingProvider`. Chamar a API de embeddings da OpenAI (modelo configurado via `EMBEDDING_MODEL`). Processar em batches de até 20 textos por requisição para respeitar limites de rate. Logar progresso (ex: `"Embedded 40/200 chunks for repo X"`).
 
-**[*] Card 3.4 — `PgVectorStore` e `PgRepositoryStore`**
+**[OK] Card 3.4 — `PgVectorStore` e `PgRepositoryStore`**
 
 Criar `infrastructure/persistence/pg_vector_store.py` implementando `VectorStore`: método `save_chunks` persiste a lista de `CodeChunk` (incluindo embedding) e método `search` executa a query de similaridade `ORDER BY embedding <=> :query_embedding LIMIT :top_k` filtrada por `repository_id`.
 
@@ -359,7 +361,7 @@ Criar `infrastructure/persistence/pg_repository_store.py` implementando `Reposit
 
 Criar `infrastructure/background/asyncio_task_dispatcher.py` implementando o contrato `TaskDispatcher` usando `asyncio.create_task`. Esta implementação é suficiente para a Fase 1 e será substituída por Celery na Fase 2 sem alterar nenhum Use Case ou rota — apenas a implementação registrada no `dependencies.py`.
 
-**[*] Card 3.6 — Script de Validação da Ingestão**
+**[OK] Card 3.6 — Script de Validação da Ingestão**
 
 Criar `scripts/validate_ingestion.py` que submete a URL de um repositório pequeno e público via `POST /repos`, aguarda a ingestão via polling em `GET /repos/{id}` e valida:
 - `status` chegou a `"ready"`
@@ -370,7 +372,7 @@ Criar `scripts/validate_ingestion.py` que submete a URL de um repositório peque
 
 ### Epic 4 — RAG Engine e Chat
 
-**[*] Card 4.1 — Use Case `ChatWithRepository`**
+**[OK] Card 4.1 — Use Case `ChatWithRepository`**
 
 Criar `application/use_cases/chat_with_repository.py`. Este Use Case recebe um `ChatRequestDTO` (com `repo_id` e `question`) e orquestra:
 1. Valida que o repositório existe e está com `status = "ready"` via `RepositoryStore`
@@ -382,16 +384,16 @@ Criar `application/use_cases/chat_with_repository.py`. Este Use Case recebe um `
 
 O chat é **stateless**: cada requisição é independente, sem histórico persistido.
 
-**[*] Card 4.2 — `OpenAILLMProvider`**
+**[OK] Card 4.2 — `OpenAILLMProvider` e `GeminiLLMProvider`**
 
-Criar `infrastructure/llm/openai_llm_provider.py` implementando o contrato `LLMProvider`. Chamar a OpenAI Chat Completions API com o modelo configurado via `LLM_MODEL`. O método `complete` recebe o prompt já montado pelo Use Case e retorna o texto da resposta.
+Criar `infrastructure/llm/openai_llm_provider.py` e `infrastructure/llm/gemini_llm_provider.py` implementando o contrato `LLMProvider`. Chamar a API configurada (`LLM_PROVIDER=gemini` com `GEMINI_LLM_MODEL` ou `LLM_PROVIDER=openai` com `LLM_MODEL`). O método `complete` recebe o prompt já montado pelo Use Case e retorna o texto da resposta.
 
-**[*] Card 4.3 — Endpoint de Chat**
+**[OK] Card 4.3 — Endpoint de Chat**
 
 Implementar schemas Pydantic em `presentation/api/schemas/chat_schemas.py` e o endpoint em `presentation/api/routes/chat.py`:
 - `POST /chat`: recebe `{ "repo_id": "uuid", "question": "..." }`, converte para `ChatRequestDTO`, chama `ChatWithRepository` e retorna `{ "answer": "...", "sources": ["path/to/file.py", ...] }`.
 
-**[*] Card 4.4 — Script de Validação do Chat**
+**[OK] Card 4.4 — Script de Validação do Chat**
 
 Criar `scripts/validate_chat.py` que, após ingestão bem-sucedida de um repositório, faz 3 perguntas ao endpoint `POST /chat` e valida:
 - Respostas não estão vazias
@@ -433,7 +435,7 @@ Criar `scripts/validate_e2e.py` que executa o fluxo completo:
 
 **[*] Card 6.2 — Documentação Final de Setup**
 
-Atualizar o README com a seção de **Setup** e **Executar**: pré-requisitos (Docker, chave da OpenAI), instruções para `.env`, comandos para subir (`docker compose up --build`) e validar (`curl /health`).
+Atualizar o README com a seção de **Setup** e **Executar**: pré-requisitos (Docker, chave da Gemini API no Google AI Studio — ou OpenAI), instruções para `.env`, comandos para subir (`docker compose up --build`) e validar (`curl /health`).
 
 ---
 
