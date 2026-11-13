@@ -404,19 +404,19 @@ Criar `scripts/validate_chat.py` que, após ingestão bem-sucedida de um reposit
 
 ### Epic 5 — Frontend React
 
-**[*] Card 5.1 — Setup do Frontend**
+**[OK] Card 5.1 — Setup do Frontend**
 
 Criar a aplicação React em `frontend/` usando Vite + TypeScript. Configurar proxy no `vite.config.ts` apontando `/api` para o backend FastAPI. Adicionar ao `docker-compose.yml` o serviço `frontend` rodando `npm run dev`. O app deve renderizar um título e confirmar conexão com o backend via `GET /health`.
 
-**[*] Card 5.2 — Tela de Submissão de Repositório**
+**[OK] Card 5.2 — Tela de Submissão de Repositório**
 
 Criar a tela inicial com campo de texto para URL do GitHub e botão "Analisar". Ao submeter, chamar `POST /repos` e exibir status via polling em `GET /repos/{id}` com feedback visual: `"Aguardando..."`, `"Indexando..."` e `"Pronto ✓"`. Ao atingir `"ready"`, navegar para a tela de chat com o `repo_id`.
 
-**[*] Card 5.3 — Tela de Chat**
+**[OK] Card 5.3 — Tela de Chat**
 
 Criar a interface de chat: histórico de mensagens (usuário à direita, assistente à esquerda), campo de input com envio por Enter ou botão "Enviar", loading state enquanto aguarda resposta. Exibir abaixo de cada resposta a lista de arquivos-fonte (`sources`) como chips ou lista colapsável.
 
-**[*] Card 5.4 — UX e Feedbacks Visuais**
+**[OK] Card 5.4 — UX e Feedbacks Visuais**
 
 Adicionar tratamento de erros com mensagens claras (ex: `"URL inválida"`, `"Repositório não encontrado"`, `"Erro ao conectar com o servidor"`). Garantir que a interface seja responsiva. Aplicar tema limpo e minimalista.
 
