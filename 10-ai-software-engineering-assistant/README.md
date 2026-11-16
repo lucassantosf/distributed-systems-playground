@@ -257,13 +257,129 @@ O projeto adota DDD de forma leve, principalmente para organizar o vocabulário 
 
 | Componente | Tecnologia |
 |---|---|
-| Frontend | React |
-| Backend | FastAPI (Python) |
-| Banco vetorial | PostgreSQL + pgvector |
-| Embeddings / LLM | Google Gemini API (Free Tier) / OpenAI API |
-| Integração GitHub | GitHub REST API v3 |
-| ORM / Migrations | SQLAlchemy + Alembic |
-| Containerização | Docker + Docker Compose |
+| Frontend | React + Vite + TypeScript (Tailwind / CSS limpo e responsivo) |
+| Backend | FastAPI (Python 3.12) |
+| Banco vetorial | PostgreSQL 16 + pgvector (`vector(1536)`) |
+| Embeddings / LLM | Google Gemini (`gemini-embedding-001`, `gemini-3.5-flash`) ou OpenAI |
+| Integração GitHub | GitHub REST API v3 (`httpx`) |
+| ORM / Migrations | SQLAlchemy 2.0 + Alembic |
+| Containerização | Docker + Docker Compose com Hot-Reload (backend e frontend) |
+
+---
+
+## 🚀 Setup e Execução
+
+### Pré-requisitos
+
+- **Docker** e **Docker Compose** instalados (v20.10+ e Compose v2+)
+- **Chave de API de IA**:
+  - **Google Gemini (Recomendado / Gratuito):** Obtenha gratuitamente em [Google AI Studio](https://aistudio.google.com/apikey).
+  - *Ou* **OpenAI:** Chave com créditos pré-pagos em [OpenAI Platform](https://platform.openai.com/api-keys).
+- *(Opcional)* **GitHub Personal Access Token:** Recomendado para aumentar o rate limit de chamadas à API do GitHub (de 60 req/hora para 5.000 req/hora). Gere em GitHub > Settings > Developer settings > Personal access tokens (Tokens classic).
+
+---
+
+### 1. Configuração do Ambiente (`.env`)
+
+Copie o arquivo de exemplo para criar seu `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Abra o arquivo `.env` e configure as chaves desejadas:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_assistant
+
+# GitHub (opcional para repos públicos pequenos)
+GITHUB_TOKEN=ghp_seu_token_aqui
+
+# Provedor padrão ativo (Google Gemini - Free Tier)
+EMBEDDING_PROVIDER=gemini
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=AIzaSy...
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+GEMINI_LLM_MODEL=gemini-3.5-flash
+
+# Provedor alternativo (OpenAI - exige créditos)
+# EMBEDDING_PROVIDER=openai
+# LLM_PROVIDER=openai
+# OPENAI_API_KEY=sk-...
+# EMBEDDING_MODEL=text-embedding-3-small
+# LLM_MODEL=gpt-4o-mini
+
+VECTOR_SEARCH_TOP_K=5
+```
+
+---
+
+### 2. Subindo a Aplicação
+
+Para construir as imagens e iniciar todos os serviços em background (`db`, `api`, `frontend`):
+
+```bash
+docker compose up --build -d
+```
+
+> **Nota:** As migrações do banco de dados (Alembic) são executadas automaticamente na inicialização do container da `api`. O frontend possui suporte a **Hot-Reload (HMR)** via volume mapeado — edições nos arquivos de `frontend/` refletem instantaneamente no navegador sem necessidade de rebuild.
+
+Para acompanhar os logs dos serviços:
+
+```bash
+docker compose logs -f api
+# ou todos os serviços:
+docker compose logs -f
+```
+
+---
+
+### 3. Validação e Acesso
+
+- **Health check da API:**
+  ```bash
+  curl http://localhost:8000/health
+  # Retorno esperado: {"status":"ok","service":"AI Software Engineering Assistant"}
+  ```
+- **Documentação Swagger (OpenAPI):**
+  Acesse no navegador: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Frontend Web (Interface do Usuário):**
+  Acesse no navegador: [http://localhost:5173](http://localhost:5173)
+  1. Digite a URL de um repositório público (ex: `https://github.com/navdeep-G/samplemod`).
+  2. Clique em **Analisar Repositório**.
+  3. Acompanhe as etapas de indexação até o status **Pronto**.
+  4. Faça perguntas em linguagem natural e receba respostas embasadas no código com lista de arquivos-fonte!
+
+---
+
+### 4. Scripts de Validação Automatizada
+
+O projeto conta com scripts para validação direta via terminal dentro do container `api`:
+
+- **Validação Completa End-to-End (E2E):**
+  ```bash
+  docker compose exec api python scripts/validate_e2e.py
+  # Ou especificando outro repositório público:
+  docker compose exec api python scripts/validate_e2e.py https://github.com/navdeep-G/samplemod
+  ```
+- **Validação Isolada da Ingestão e Vetorização:**
+  ```bash
+  docker compose exec api python scripts/validate_ingestion.py
+  ```
+- **Validação Isolada do Chat RAG:**
+  ```bash
+  docker compose exec api python scripts/validate_chat.py
+  ```
+
+---
+
+### 5. Encerrando os Serviços
+
+```bash
+docker compose down
+# Para remover também o volume do banco de dados:
+# docker compose down -v
+```
 
 ---
 
@@ -424,7 +540,7 @@ Adicionar tratamento de erros com mensagens claras (ex: `"URL inválida"`, `"Rep
 
 ### Epic 6 — Validação End-to-End e Documentação
 
-**[*] Card 6.1 — Fluxo Completo Ponta-a-Ponta**
+**[OK] Card 6.1 — Fluxo Completo Ponta-a-Ponta**
 
 Criar `scripts/validate_e2e.py` que executa o fluxo completo:
 1. Submeter URL de repositório público via `POST /repos`
@@ -433,7 +549,7 @@ Criar `scripts/validate_e2e.py` que executa o fluxo completo:
 4. Validar que todas as respostas contêm `answer` e `sources`
 5. Imprimir relatório `PASS/FAIL` por etapa
 
-**[*] Card 6.2 — Documentação Final de Setup**
+**[OK] Card 6.2 — Documentação Final de Setup**
 
 Atualizar o README com a seção de **Setup** e **Executar**: pré-requisitos (Docker, chave da Gemini API no Google AI Studio — ou OpenAI), instruções para `.env`, comandos para subir (`docker compose up --build`) e validar (`curl /health`).
 
