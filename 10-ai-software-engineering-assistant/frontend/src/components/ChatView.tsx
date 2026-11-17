@@ -29,8 +29,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
   ]);
   const [input, setInput] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingSeconds, setLoadingSeconds] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -42,6 +44,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      setLoadingSeconds(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLoadingSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const getLoadingMessage = (seconds: number) => {
+    if (seconds < 3) return "Consultando vetores e arquivos relevantes...";
+    if (seconds < 7) return "Sintetizando resposta com modelo de IA...";
+    return "Processando análise detalhada do código...";
+  };
+
+  const handleCopy = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const handleSend = async (questionToSend?: string) => {
     const question = (questionToSend || input).trim();
@@ -59,6 +84,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     setMessages((prev) => [...prev, userMessage]);
     setLoading(true);
+    const startTime = performance.now();
 
     try {
       const res = await fetch("/api/chat", {
@@ -91,12 +117,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
       }
 
       const data: ChatResponsePayload = await res.json();
+      const elapsed = parseFloat(((performance.now() - startTime) / 1000).toFixed(1));
 
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: data.answer,
         sources: data.sources,
+        latencySeconds: elapsed,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -187,6 +215,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {msg.role === "assistant" && msg.id !== "welcome" && (
+                <div className="bubble-footer">
+                  {msg.latencySeconds !== undefined && (
+                    <span className="latency-badge" title="Tempo de resposta">
+                      ⚡ {msg.latencySeconds}s
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    onClick={() => handleCopy(msg.id, msg.content)}
+                    title="Copiar resposta"
+                  >
+                    {copiedId === msg.id ? "✓ Copiado" : "📋 Copiar"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -195,7 +241,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
           <div className="chat-bubble-row row-assistant">
             <div className="chat-bubble bubble-assistant loading-bubble">
               <span className="spinner" />
-              <span>Consultando vetores e formulando resposta...</span>
+              <div className="loading-content">
+                <span className="loading-text">
+                  {getLoadingMessage(loadingSeconds)}
+                </span>
+                <span className="loading-timer-badge">{loadingSeconds}s</span>
+              </div>
             </div>
           </div>
         )}

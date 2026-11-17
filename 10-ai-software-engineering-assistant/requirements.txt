@@ -18,3 +18,10 @@ openai==1.57.0
 # Google Gemini SDK
 google-genai==1.12.1
 
+# Task Queue (Celery + Redis)
+celery[redis]==5.4.0
+kombu==5.6.2
+redis==5.2.0
+packaging>=24.0
+
+

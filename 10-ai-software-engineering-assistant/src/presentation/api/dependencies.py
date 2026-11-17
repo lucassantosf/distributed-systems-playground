@@ -12,6 +12,7 @@ from src.application.interfaces.vector_store import VectorStore
 from src.application.use_cases.chat_with_repository import ChatWithRepository
 from src.application.use_cases.ingest_repository import IngestRepository
 from src.infrastructure.background.asyncio_task_dispatcher import AsyncioTaskDispatcher
+from src.infrastructure.background.celery_task_dispatcher import CeleryTaskDispatcher
 from src.infrastructure.embeddings.gemini_embedding_provider import GeminiEmbeddingProvider
 from src.infrastructure.embeddings.openai_embedding_provider import OpenAIEmbeddingProvider
 from src.infrastructure.github.github_repository_provider import GithubRepositoryProvider
@@ -35,6 +36,8 @@ def get_repository_store(db: DatabaseSession) -> RepositoryStore:
 
 
 def get_task_dispatcher() -> TaskDispatcher:
+    if settings.task_dispatcher.lower() == "celery":
+        return CeleryTaskDispatcher()
     return AsyncioTaskDispatcher()
 
 

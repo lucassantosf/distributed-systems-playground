@@ -20,6 +20,7 @@ export interface ChatMessage {
   content: string;
   sources?: string[];
   timestamp?: string;
+  latencySeconds?: number;
 }
 
 export interface ChatRequestPayload {

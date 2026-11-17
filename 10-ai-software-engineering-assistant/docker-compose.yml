@@ -17,6 +17,38 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Containerfile
+    command: celery -A src.infrastructure.background.celery_app.celery_app worker --loglevel=info --concurrency=2
+    env_file:
+      - .env
+    environment:
+      PYTHONPATH: /app
+      PYTHONIOENCODING: utf-8
+    volumes:
+      - .:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   frontend:
     build:
@@ -48,3 +80,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:

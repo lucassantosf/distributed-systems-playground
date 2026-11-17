@@ -205,7 +205,7 @@ A tabela abaixo documenta cada contrato definido na camada de `application/inter
 | Chamar um LLM | `LLMProvider` | `GeminiLLMProvider` (Google Gemini) / `OpenAILLMProvider` |
 | Armazenar e buscar chunks | `VectorStore` | `PgVectorStore` (PostgreSQL + pgvector) |
 | Persistir metadados de repos | `RepositoryStore` | `PgRepositoryStore` (SQLAlchemy) |
-| Despachar tarefas em background | `TaskDispatcher` | `AsyncioTaskDispatcher` (asyncio.create_task) |
+| Despachar tarefas em background | `TaskDispatcher` | `CeleryTaskDispatcher` (Celery + Redis) / `AsyncioTaskDispatcher` |
 
 > **Nota sobre `RepositoryStore`:** o nome intencionalmente evita `RepositoryRepository` (padrão Repository aplicado à entidade `Repository`), que causaria confusão de leitura. `RepositoryStore` é equivalente e mais claro.
 
@@ -260,7 +260,7 @@ O projeto adota DDD de forma leve, principalmente para organizar o vocabulário 
 | Frontend | React + Vite + TypeScript (Tailwind / CSS limpo e responsivo) |
 | Backend | FastAPI (Python 3.12) |
 | Banco vetorial | PostgreSQL 16 + pgvector (`vector(1536)`) |
-| Embeddings / LLM | Google Gemini (`gemini-embedding-001`, `gemini-3.5-flash`) ou OpenAI |
+| Embeddings / LLM | Google Gemini (`gemini-embedding-001`, `gemini-3.5-flash-lite`) ou OpenAI |
 | Integração GitHub | GitHub REST API v3 (`httpx`) |
 | ORM / Migrations | SQLAlchemy 2.0 + Alembic |
 | Containerização | Docker + Docker Compose com Hot-Reload (backend e frontend) |
@@ -300,7 +300,7 @@ EMBEDDING_PROVIDER=gemini
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=AIzaSy...
 GEMINI_EMBEDDING_MODEL=gemini-embedding-001
-GEMINI_LLM_MODEL=gemini-3.5-flash
+GEMINI_LLM_MODEL=gemini-3.5-flash-lite
 
 # Provedor alternativo (OpenAI - exige créditos)
 # EMBEDDING_PROVIDER=openai
@@ -561,11 +561,10 @@ Atualizar o README com a seção de **Setup** e **Executar**: pré-requisitos (D
 
 | Card | Descrição |
 |---|---|
-| **F2-1** | **Redis + Celery (TaskDispatcher)** — substituir `AsyncioTaskDispatcher` por `CeleryTaskDispatcher` implementando o mesmo contrato `TaskDispatcher`. Nenhum Use Case ou rota precisará mudar — apenas a implementação registrada em `dependencies.py` e a configuração do Docker Compose |
-| **F2-2** | **Histórico de Conversas** — criar entidade `Conversation` no domínio, persistir mensagens e respostas, e permitir retomar conversas anteriores. O chat deixa de ser stateless |
-| **F2-3** | **Tool Calling com LLM** — permitir que o LLM chame ferramentas (ex: buscar um arquivo específico, listar módulos do repo) em vez de depender apenas do RAG passivo |
-| **F2-4** | **Rastreabilidade de Respostas** — exibir na UI os trechos exatos de código que embasaram cada resposta, com destaque visual e link para o arquivo no GitHub |
-| **F2-5** | **Análise de Dependências** — Use Case `AnalyzeRepository`: gerar mapa de dependências entre módulos (imports, chamadas entre serviços) e expô-lo na UI |
-| **F2-6** | **Análise de Impacto de Alterações** — Use Case `AnalyzeCodeImpact`: dado um arquivo ou função, identificar quais outras partes do sistema seriam impactadas por uma mudança |
-| **F2-7** | **Cache de Embeddings** — evitar re-embedding de arquivos que não mudaram entre re-ingestões do mesmo repositório, usando hash do conteúdo como chave de cache |
-| **F2-8** | **Suporte a Repositórios Privados** — autenticação com GitHub OAuth para acessar repos privados do usuário autenticado |
+| [OK] **F2-1** | **Redis + Celery (TaskDispatcher)** — substituir `AsyncioTaskDispatcher` por `CeleryTaskDispatcher` implementando o mesmo contrato `TaskDispatcher`. Nenhum Use Case ou rota precisará mudar — apenas a implementação registrada em `dependencies.py` e a configuração do Docker Compose |
+| [*] **F2-2** | **Histórico de Conversas** — criar entidade `Conversation` no domínio, persistir mensagens e respostas, e permitir retomar conversas anteriores. O chat deixa de ser stateless |
+| [*] **F2-3** | **Tool Calling com LLM** — permitir que o LLM chame ferramentas (ex: buscar um arquivo específico, listar módulos do repo) em vez de depender apenas do RAG passivo |
+| [*] **F2-4** | **Rastreabilidade de Respostas** — exibir na UI os trechos exatos de código que embasaram cada resposta, com destaque visual e link para o arquivo no GitHub |
+| [*] **F2-5** | **Análise de Dependências** — Use Case `AnalyzeRepository`: gerar mapa de dependências entre módulos (imports, chamadas entre serviços) e expô-lo na UI |
+| [*] **F2-6** | **Análise de Impacto de Alterações** — Use Case `AnalyzeCodeImpact`: dado um arquivo ou função, identificar quais outras partes do sistema seriam impactadas por uma mudança |
+| [*] **F2-7** | **Cache de Embeddings** — evitar re-embedding de arquivos que não mudaram entre re-ingestões do mesmo repositório, usando hash do conteúdo como chave de cache |
