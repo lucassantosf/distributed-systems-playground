@@ -3,6 +3,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from src.application.chunker import chunk_files
+from src.application.interfaces.conversation_store import ConversationStore
 from src.application.interfaces.embedding_provider import EmbeddingProvider
 from src.application.interfaces.llm_provider import LLMProvider
 from src.application.interfaces.repository_provider import RepositoryProvider
@@ -19,6 +20,7 @@ from src.infrastructure.github.github_repository_provider import GithubRepositor
 from src.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from src.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 from src.infrastructure.persistence.database import get_db, SessionLocal
+from src.infrastructure.persistence.pg_conversation_store import PgConversationStore
 from src.infrastructure.persistence.pg_repository_store import PgRepositoryStore
 from src.infrastructure.persistence.pg_vector_store import PgVectorStore
 from src.settings import settings
@@ -33,6 +35,10 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 
 def get_repository_store(db: DatabaseSession) -> RepositoryStore:
     return PgRepositoryStore(db)
+
+
+def get_conversation_store(db: DatabaseSession) -> ConversationStore:
+    return PgConversationStore(db)
 
 
 def get_task_dispatcher() -> TaskDispatcher:
@@ -120,6 +126,7 @@ def get_chat_with_repository_use_case(
     embedding_provider: Annotated[EmbeddingProvider, Depends(get_embedding_provider)],
     vector_store: Annotated[VectorStore, Depends(get_vector_store)],
     llm_provider: Annotated[LLMProvider, Depends(get_llm_provider)],
+    conversation_store: Annotated[ConversationStore, Depends(get_conversation_store)],
 ) -> ChatWithRepository:
     """
     Fábrica do Use Case ChatWithRepository para rotas HTTP (síncrono por request).
@@ -129,5 +136,6 @@ def get_chat_with_repository_use_case(
         embedding_provider=embedding_provider,
         vector_store=vector_store,
         llm_provider=llm_provider,
+        conversation_store=conversation_store,
         top_k=settings.vector_search_top_k,
     )

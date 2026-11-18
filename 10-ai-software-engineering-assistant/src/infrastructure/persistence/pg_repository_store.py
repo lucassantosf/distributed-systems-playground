@@ -39,6 +39,14 @@ class PgRepositoryStore(RepositoryStore):
                 model.indexed_at = datetime.now(timezone.utc)
             self.db.commit()
 
+    def list_all(self) -> list[Repository]:
+        models = (
+            self.db.query(RepositoryModel)
+            .order_by(RepositoryModel.created_at.desc())
+            .all()
+        )
+        return [self._to_entity(m) for m in models]
+
     @staticmethod
     def _to_entity(model: RepositoryModel) -> Repository:
         return Repository(

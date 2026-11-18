@@ -20,6 +20,28 @@ from src.presentation.api.schemas.repo_schemas import (
 router = APIRouter(prefix="/repos", tags=["repositories"])
 
 
+@router.get(
+    "",
+    response_model=list[RepositoryResponse],
+    summary="Listar todos os repositórios cadastrados",
+)
+def list_repositories(
+    repository_store: Annotated[RepositoryStore, Depends(get_repository_store)],
+):
+    repos = repository_store.list_all()
+    return [
+        RepositoryResponse(
+            id=r.id,
+            github_url=r.github_url,
+            name=r.name,
+            status=r.status.value,
+            created_at=r.created_at,
+            indexed_at=r.indexed_at,
+        )
+        for r in repos
+    ]
+
+
 @router.post(
     "",
     response_model=CreateRepositoryResponse,

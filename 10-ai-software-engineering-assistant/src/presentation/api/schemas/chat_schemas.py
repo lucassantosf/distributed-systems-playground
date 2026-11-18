@@ -16,6 +16,10 @@ class ChatRequest(BaseModel):
         description="Pergunta em linguagem natural sobre o código do repositório",
         examples=["Como funciona a estrutura principal deste projeto?"],
     )
+    conversation_id: UUID | None = Field(
+        default=None,
+        description="UUID de uma conversa existente para retomá-la. Se omitido, cria nova.",
+    )
 
     @field_validator("question")
     @classmethod
@@ -26,13 +30,22 @@ class ChatRequest(BaseModel):
         return clean
 
     def to_dto(self) -> ChatRequestDTO:
-        return ChatRequestDTO(repo_id=self.repo_id, question=self.question)
+        return ChatRequestDTO(
+            repo_id=self.repo_id,
+            question=self.question,
+            conversation_id=self.conversation_id,
+        )
 
 
 class ChatResponse(BaseModel):
     answer: str
     sources: list[str]
+    conversation_id: str
 
     @classmethod
     def from_dto(cls, dto: ChatResponseDTO) -> "ChatResponse":
-        return cls(answer=dto.answer, sources=dto.sources)
+        return cls(
+            answer=dto.answer,
+            sources=dto.sources,
+            conversation_id=str(dto.conversation_id),
+        )

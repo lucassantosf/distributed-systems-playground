@@ -55,3 +55,10 @@ class RepositoryStore(ABC):
         """
         ...
 
+    @abstractmethod
+    def list_all(self) -> list[Repository]:
+        """
+        Retorna todos os repositórios cadastrados, ordenados pelo mais recente.
+        """
+        ...
+

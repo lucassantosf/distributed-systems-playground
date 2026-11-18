@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI
 
-from src.presentation.api.routes import chat, health, repos
+from src.presentation.api.routes import chat, conversations, health, repos
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +20,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, tags=["health"])
     app.include_router(repos.router)
     app.include_router(chat.router)
+    app.include_router(conversations.router)
 
     return app
 
